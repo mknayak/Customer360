@@ -14,6 +14,21 @@ fi
 
 service_pids=()
 
+free_port() {
+  local port="$1"
+  local pids
+
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+  if [[ -z "$pids" ]]; then
+    return
+  fi
+
+  echo "Force-stopping process(es) using port $port: $pids"
+  while read -r pid; do
+    [[ -z "$pid" ]] || kill -KILL "$pid" 2>/dev/null || true
+  done <<< "$pids"
+}
+
 cleanup() {
   exit_code=$?
   trap - EXIT INT TERM
@@ -43,6 +58,7 @@ start_service() {
     return
   fi
 
+  free_port "$port"
   echo "Starting $name on http://$SERVICE_HOST:$port"
   PYTHONUNBUFFERED=1 "$PYTHON" -m uvicorn "$module" \
     --app-dir "$service_dir" \
@@ -60,6 +76,7 @@ start_simulator() {
     return
   fi
 
+  free_port 8080
   echo "Starting simulator on http://$SERVICE_HOST:8080"
   PYTHONUNBUFFERED=1 "$PYTHON" "$server_file" &
   service_pids+=("$!")

@@ -7,6 +7,8 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).parent
 CRM_ORIGIN = "http://127.0.0.1:8001"
+PRODUCT_ORIGIN = "http://127.0.0.1:8002"
+SHOPPING_ORIGIN = "http://127.0.0.1:8003"
 
 
 class SimulatorHandler(SimpleHTTPRequestHandler):
@@ -17,11 +19,32 @@ class SimulatorHandler(SimpleHTTPRequestHandler):
         if self.path.startswith("/crm/"):
             self._proxy("GET")
             return
+        if self.path.startswith("/product/"):
+            self._proxy("GET")
+            return
+        if self.path.startswith("/shopping/"):
+            self._proxy("GET")
+            return
         super().do_GET()
 
     def do_POST(self):
         if self.path.startswith("/crm/"):
             self._proxy("POST")
+            return
+        if self.path.startswith("/product/") or self.path.startswith("/shopping/"):
+            self._proxy("POST")
+            return
+        self.send_error(405, "Method not allowed")
+
+    def do_PUT(self):
+        if self.path.startswith("/product/") or self.path.startswith("/shopping/"):
+            self._proxy("PUT")
+            return
+        self.send_error(405, "Method not allowed")
+
+    def do_DELETE(self):
+        if self.path.startswith("/product/") or self.path.startswith("/shopping/"):
+            self._proxy("DELETE")
             return
         self.send_error(405, "Method not allowed")
 
@@ -30,7 +53,14 @@ class SimulatorHandler(SimpleHTTPRequestHandler):
         if method == "POST":
             length = int(self.headers.get("Content-Length", "0"))
             request_body = self.rfile.read(length)
-        request = Request(f"{CRM_ORIGIN}{self.path[4:]}", data=request_body, method=method)
+        prefix, origin = self.path.split("/", 2)[1], None
+        if prefix == "crm":
+            origin = CRM_ORIGIN
+        elif prefix == "product":
+            origin = PRODUCT_ORIGIN
+        elif prefix == "shopping":
+            origin = SHOPPING_ORIGIN
+        request = Request(f"{origin}{self.path[len(prefix) + 1:]}", data=request_body, method=method)
         request.add_header("Content-Type", self.headers.get("Content-Type", "application/json"))
         try:
             with urlopen(request, timeout=5) as response:
@@ -48,7 +78,7 @@ class SimulatorHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(payload)
         except URLError:
-            self.send_error(503, "CRM API is unavailable")
+            self.send_error(503, f"{prefix.title()} API is unavailable")
 
 
 if __name__ == "__main__":

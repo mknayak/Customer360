@@ -1,0 +1,62 @@
+You are generating synthetic product and store catalog seed data for a local Customer360 simulator.
+
+Generate exactly {{COUNT}} catalog records. Each record represents one product listed in one store. Use realistic synthetic retail data across multiple stores, channels, categories, brands, currencies, prices, and inventory levels. Do not use placeholders such as Product001, Store001, Test SKU, or Item 1.
+
+This is test data only. Do not use real brands, real products, real stores, real addresses, or copyrighted product descriptions. Use fictional brand and store names.
+
+Output requirements:
+- Return CSV only.
+- Do not include Markdown fences, commentary, explanations, or a summary.
+- Include exactly one header row followed by exactly {{COUNT}} data rows.
+- Use this exact column order:
+  store_name,channel,city,country,sku,name,description,brand,price_amount,currency,quantity,reserved_quantity,product_status,catalog_status
+- Quote any CSV field containing a comma.
+- Use UTF-8 text and ordinary ASCII punctuation.
+
+Store and channel rules:
+- store_name: fictional store name; reuse a store name for multiple products to create a store catalog.
+- A store_name identifies exactly one store in exactly one country. Never emit the same store_name with different city, country, or currency values. If the same retail brand operates in multiple countries, give each store a distinct name, such as Alpine Haus Berlin and Alpine Haus Mumbai.
+- channel: exactly one of physical, online, or both. Never use store, retail, web, ecommerce, or other labels.
+- city: plausible city consistent with country, without a street address.
+- country: uppercase two-letter country code such as US, CA, GB, FR, DE, IN, JP, or AU.
+- Use at least 3 distinct stores when {{COUNT}} is 100 or greater.
+- Each store should have multiple products.
+
+Product rules:
+- sku: uppercase identifier matching exactly `SKU-CC-NNNNN`, where CC is the row's two-letter country code and NNNNN is a five-digit sequence, such as SKU-GB-00001. The same SKU may appear in multiple store rows only when it represents the same product; its name, description, and brand must remain identical.
+- name: fictional, human-readable product name.
+- description: short factual synthetic description, no more than 80 characters.
+- brand: fictional brand name.
+- Do not repeat the same SKU or product name unnecessarily.
+- product_status: exactly active or inactive; use active for approximately 85-95% of products.
+- catalog_status: exactly active or inactive; use active for approximately 85-95% of catalog entries.
+
+Price and inventory rules:
+- price_amount: positive decimal amount with at most two decimal places; do not include a currency symbol.
+- currency: uppercase three-letter currency code consistent with the country: US -> USD, CA -> CAD, GB -> GBP, FR/DE -> EUR, IN -> INR, JP -> JPY, AU -> AUD. Use one currency per store and never mix currencies within a store_name.
+- quantity: whole number from 0 through 1000.
+- reserved_quantity: whole number from 0 through quantity; never exceed quantity.
+- Keep most active catalog entries stocked with quantity greater than zero.
+- A product may have different prices and inventory in different stores.
+
+Distribution guidance:
+- Use a broad mix of countries, cities, currencies, store channels, product categories, price ranges, and stock levels.
+- Include some out-of-stock products and some inactive products for realistic filtering tests.
+- Keep the output deterministic when a seed is provided: {{SEED}}.
+
+Before returning the CSV, silently validate that:
+1. There are exactly {{COUNT}} data rows.
+2. Every row has exactly 14 columns in the specified order.
+3. Every SKU matches `SKU-[A-Z]{2}-[0-9]{5}` and its country segment matches the row country.
+4. Repeated SKUs have identical product identity fields: name, description, and brand.
+5. Every store_name maps to exactly one country and one currency.
+6. Every channel is exactly physical, online, or both.
+7. Every currency matches the country mapping above.
+8. Every price is positive.
+9. Every quantity and reserved_quantity is a non-negative integer.
+10. reserved_quantity is never greater than quantity.
+11. No duplicate store_name + SKU pair exists.
+12. No store_name or brand is a real company or location.
+13. No field contains fabricated claims about a real person.
+
+For large requests such as 10,000 records, produce the output in numbered batches of {{BATCH_SIZE}} rows while preserving the same header and schema. If the calling tool cannot safely return all rows at once, state that limitation instead of truncating or inventing a partial success.
