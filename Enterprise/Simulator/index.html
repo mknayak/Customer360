@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Northstar Shopping Simulator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar"><div class="brand"><span class="brand-mark">N</span><span>Northstar</span></div><span class="environment"><span class="pulse"></span>Local simulation</span></header>
+    <nav class="tabs" aria-label="Simulator views"><button class="tab active" data-tab="journey">Shopping journey</button><button class="tab" data-tab="customers">Customers</button></nav>
+    <section id="journey-view" class="view active-view">
+      <section class="intro"><p class="eyebrow">Behavior lab / Session 001</p><h1>Turn a visit into a signal.</h1><p class="lede">Run a controlled shopping journey and send the resulting customer event to the local CRM service.</p></section>
+      <section class="workspace">
+      <div class="product-panel"><div class="product-art"><span>01</span><div class="orb"></div></div><div class="product-copy"><p class="eyebrow">Field objects / 2026</p><h2>Orbit kettle</h2><p>A quiet, precise pour-over kettle designed for daily rituals.</p><div class="price-row"><strong>$84</strong><span>Ships tomorrow</span></div><button id="start-journey" class="primary">Start visit <span>→</span></button></div></div>
+      <aside class="journey-panel"><div class="panel-heading"><div><p class="eyebrow">Journey control</p><h2>Live funnel</h2></div><span id="journey-state" class="state">Ready</span></div><div id="steps" class="steps"></div><div class="scenario-actions"><button data-outcome="purchase">Complete purchase</button><button data-outcome="abandon">Abandon cart</button><button data-outcome="failure">Payment failure</button></div><p id="feedback" class="feedback" role="status">Choose a journey to begin.</p></aside>
+      </section>
+    </section>
+    <section id="customers-view" class="view customer-view" hidden>
+      <div class="customer-heading"><div><p class="eyebrow">CRM / Customer data</p><h2>Load customer identities</h2><p class="lede">Import the bundled dataset or choose an edited CSV. Existing emails are updated; new emails create customers.</p></div><span id="customer-count" class="state">Not loaded</span></div>
+      <div class="customer-actions"><button id="load-default-csv" class="primary">Load bundled CSV <span>↓</span></button><label class="file-button" for="customer-file">Choose edited CSV</label><input id="customer-file" type="file" accept=".csv,text/csv"></div>
+      <div class="customer-preview"><div class="preview-heading"><span>Preview</span><span id="customer-file-name">customers.csv</span></div><pre id="customer-preview-text">Load a CSV to preview the first customer rows.</pre></div>
+      <button id="import-customers" class="import-button" disabled>Import customers to CRM</button>
+      <p id="customer-feedback" class="feedback" role="status">CRM must be running on port 8001.</p>
+      <section class="customer-directory" aria-labelledby="directory-title">
+        <div class="directory-toolbar"><div><p class="eyebrow">CRM / Directory</p><h3 id="directory-title">Customers</h3></div><div class="directory-controls"><label class="search-field"><span>Search</span><input id="customer-search" type="search" placeholder="Name, email, city..." autocomplete="off"></label><button id="refresh-customers" class="refresh-button">Refresh</button></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Location</th><th>Status</th><th>Channel</th></tr></thead><tbody id="customer-table-body"><tr><td colspan="5" class="table-message">Click Refresh to load customers.</td></tr></tbody></table></div>
+        <div class="table-footer"><p id="customer-table-summary" class="table-summary"></p><div class="pagination"><button id="previous-customers" class="page-button" disabled>Previous</button><span id="customer-page-label">Page 1</span><button id="next-customers" class="page-button" disabled>Next</button></div></div>
+      </section>
+    </section>
+    <footer><span>Customer360 / Enterprise Simulator</span><span id="api-status">Checking CRM...</span></footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+You are generating synthetic customer seed data for a local Customer360 simulator.
+
+Generate exactly {{COUNT}} customer records. Use a diverse, globally realistic population with varied first names, optional middle names embedded in first_name, and varied last names. The records must look like plausible synthetic users, not placeholders such as Test001, User123, John Doe, or Customer 1.
+
+This is test data only. Do not use real people's personal information, famous people, public figures, real phone numbers, or real email addresses. Use the reserved domain customer360.test for every email address.
+
+Output requirements:
+- Return CSV only.
+- Do not include Markdown fences, commentary, explanations, or a summary.
+- Include exactly one header row followed by exactly {{COUNT}} data rows.
+- Use this exact column order:
+  first_name,last_name,email,phone,status,age_group,city,country,preferred_channel
+- Quote any CSV field containing a comma.
+- Use UTF-8 text and ordinary ASCII punctuation.
+
+Identity requirements:
+- Every email must be unique.
+- Every email must use lowercase and end with @customer360.test.
+- Build email addresses from the person's name plus a unique numeric suffix, for example: laila-kendall.santos.0042@customer360.test.
+- If first_name contains a middle name, keep it in the same field separated by one space, for example: Laila Kendall.
+- Use at least 50 distinct first names, at least 50 distinct last names, and at least 50 distinct middle names across the dataset when {{COUNT}} is 500 or greater.
+- Do not repeat the same first-name/last-name combination more than necessary.
+
+Field rules:
+- first_name: realistic given name, optionally including one middle name.
+- last_name: realistic family name.
+- email: unique synthetic email at customer360.test.
+- phone: synthetic phone number using the format +1-555-XXX-XXXX; never use a real number.
+- status: active for approximately 90-95% of records and inactive for the remainder.
+- age_group: one of 18-24, 25-34, 35-44, 45-54, or 55-64.
+- city: a plausible city consistent with country.
+- country: an uppercase two-letter country code such as US, CA, GB, FR, DE, IN, BR, JP, or AU.
+- preferred_channel: one of email, sms, or push.
+
+Distribution guidance:
+- Use a broad mix of countries and cities rather than making most users belong to one location.
+- Mix age groups and preferred channels.
+- Keep names culturally varied and avoid stereotypes.
+- Make the output deterministic when a seed is provided: {{SEED}}.
+
+Before returning the CSV, silently validate that:
+1. There are exactly {{COUNT}} data rows.
+2. Every email is unique and uses @customer360.test.
+3. Every row has exactly 9 columns.
+4. No first_name begins with Test, User, Customer, or Visitor.
+5. No field contains fabricated claims about a real person.
+
+For large requests such as 10,000 records, produce the output in numbered batches of {{BATCH_SIZE}} rows while preserving the same header and schema. If the calling tool cannot safely return all rows at once, state that limitation instead of truncating or inventing a partial success.
