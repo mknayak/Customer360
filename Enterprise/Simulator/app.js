@@ -202,6 +202,10 @@ async function importCatalog() {
   const products = await api('product', '/api/products'); const stores = await api('product', '/api/stores');
   const productsBySku = new Map(products.map((product) => [product.sku, product])); const storesByName = new Map(stores.map((store) => [store.name, store]));
   for (const [index, row] of pendingCatalog.entries()) {
+    const existingStore = storesByName.get(row.store_name);
+    if (existingStore && existingStore.country && existingStore.country !== row.country.trim().toUpperCase()) throw new Error(`Catalog row ${index + 2}: store "${row.store_name}" already belongs to ${existingStore.country}.`);
+  }
+  for (const [index, row] of pendingCatalog.entries()) {
     let product = productsBySku.get(row.sku);
     if (!product) { product = await api('product', '/api/products', { method: 'POST', body: JSON.stringify({ sku: row.sku, name: row.name, description: row.description || null, brand: row.brand || null, status: row.product_status || 'active' }) }); productsBySku.set(row.sku, product); }
     let store = storesByName.get(row.store_name);
