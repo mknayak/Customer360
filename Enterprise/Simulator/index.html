@@ -9,7 +9,7 @@
 <body>
   <main class="shell">
     <header class="topbar"><div class="brand"><span class="brand-mark">N</span><span>Northstar</span></div><span class="environment"><span class="pulse"></span>Local simulation</span></header>
-    <nav class="tabs" aria-label="Simulator views"><button class="tab active" data-tab="journey">Shopping journey</button><button class="tab" data-tab="orders">Carts / orders</button><button class="tab" data-tab="customers">Customers</button><button class="tab" data-tab="catalog">Product / store data</button><button class="tab" data-tab="engagement">Marketing / feedback</button></nav>
+    <nav class="tabs" aria-label="Simulator views"><button class="tab active" data-tab="journey">Shopping journey</button><button class="tab" data-tab="orders">Carts / orders</button><button class="tab" data-tab="customers">Customers</button><button class="tab" data-tab="catalog">Product / store data</button><button class="tab" data-tab="sites">Sites</button><button class="tab" data-tab="engagement">Marketing / feedback</button></nav>
     <aside id="left-sidebar" class="left-panel"><div class="side-header"><p class="eyebrow" id="left-sidebar-kicker">Simulator</p><h3 id="left-sidebar-title">Actions</h3></div><div id="left-sidebar-body" class="side-body"></div></aside>
     <aside id="record-detail-panel" class="detail-panel" hidden><div class="detail-header"><div><p class="eyebrow" id="record-detail-type">Record details</p><h3 id="record-detail-title">Select a row</h3></div><button id="close-record-detail" class="page-button">Close</button></div><div id="record-detail-body" class="detail-body"><p class="table-message">Click a table row to inspect details.</p></div></aside>
     <section id="journey-view" class="view active-view">
@@ -51,6 +51,13 @@
       <div class="directory-toolbar"><div><p class="eyebrow">Catalog / Inventory</p><h3>Products by store</h3></div><div class="directory-controls"><label class="search-field"><span>Store</span><select id="catalog-store-filter"><option value="">All stores</option></select></label><button id="refresh-catalog" class="refresh-button">Refresh</button></div></div>
       <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th>Store</th><th>Price</th><th>Available</th><th>Status</th></tr></thead><tbody id="catalog-table-body"><tr><td colspan="6" class="table-message">Click Refresh to load the catalog.</td></tr></tbody></table></div>
       <p id="catalog-directory-feedback" class="feedback" role="status">Product service must be running on port 8002.</p>
+    </section>
+    <section id="sites-view" class="view customer-view" hidden>
+      <div class="customer-heading"><div><p class="eyebrow">Site / Visit data</p><h2>Track store and website sessions</h2><p class="lede">Sites are owned by the Site service, while visits link to customers and orders via IDs, preserving the service boundary.</p></div><span id="sites-state" class="state">Not loaded</span></div>
+      <div class="directory-toolbar"><div><p class="eyebrow">Site / Filters</p><h3>Find session activity</h3></div><div class="directory-controls"><label class="search-field"><span>Customer</span><select id="sites-customer-filter"><option value="">All customers</option></select></label><button id="refresh-sites" class="refresh-button">Refresh</button></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Site</th><th>Type</th><th>City</th><th>Status</th><th>Visits</th></tr></thead><tbody id="site-table-body"><tr><td colspan="5" class="table-message">Click Refresh to load site data.</td></tr></tbody></table></div>
+      <div class="table-wrap stacked-table"><table><thead><tr><th>Visit</th><th>Customer</th><th>Site</th><th>Channel</th><th>Started</th><th>Ended</th></tr></thead><tbody id="visit-table-body"><tr><td colspan="6" class="table-message">Click Refresh to load visits.</td></tr></tbody></table></div>
+      <p id="sites-feedback" class="feedback" role="status">Site service must be running on port 8004.</p>
     </section>
     <section id="engagement-view" class="view customer-view" hidden>
       <div class="customer-heading"><div><p class="eyebrow">Marketing / Feedback</p><h2>Simulate customer engagement</h2><p class="lede">Import campaign definitions, record campaign touches, and submit customer feedback tied to the same customer and campaign IDs.</p></div><span id="engagement-state" class="state">Not loaded</span></div>

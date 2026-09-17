@@ -29,6 +29,10 @@ let orderTotal = 0;
 let productsById = new Map();
 let catalogDirectoryRows = [];
 let currentCustomerId = '';
+let sites = [];
+let visits = [];
+let activeSite = null;
+let activeVisit = null;
 
 const api = async (service, path, options = {}) => {
   const response = await fetch(`/${service}${path}`, { headers: { 'Content-Type': 'application/json' }, ...options });
@@ -78,6 +82,26 @@ async function seedCatalog() {
   return store;
 }
 
+async function ensureSite() {
+  const sites = await api('site', '/api/sites');
+  const siteName = 'Northstar Shopping Simulator';
+  let site = sites.find((item) => item.name === siteName);
+  if (!site) {
+    site = await api('site', '/api/sites', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: siteName,
+        type: 'WEBSITE',
+        city: 'Remote',
+        country: 'US',
+        status: 'active',
+      }),
+    });
+  }
+  activeSite = site;
+  return site;
+}
+
 async function loadStoreCatalog() {
   const entries = await api('product', `/api/stores/${storeSelect.value}/catalog`);
   const inventory = await api('product', `/api/stores/${storeSelect.value}/inventory`);
@@ -100,9 +124,10 @@ async function loadJourneyData() {
     storeSelect.value = store.store_id;
     if (!currentCustomerId && loadedCustomers[0]) currentCustomerId = loadedCustomers[0].customer_id;
     renderJourneyCustomers();
+    await ensureSite();
     await loadStoreCatalog();
     activateLeftSidebar(document.querySelector('.tab.active')?.dataset.tab || 'journey');
-    apiStatusElement.textContent = 'CRM · Product · Shopping connected';
+    apiStatusElement.textContent = 'CRM · Product · Shopping · Site connected';
   } catch (error) {
     feedbackElement.textContent = `${error.message}. Start services with ./run.sh.`;
     apiStatusElement.textContent = 'Service unavailable';
@@ -160,10 +185,19 @@ function validateCatalogRows(rows) {
 async function startVisit() {
   const products = selectedProducts();
   if (!customerSelect.value || !products.length) { feedbackElement.textContent = 'Select a customer and at least one available product.'; return; }
+  const site = await ensureSite();
+  activeVisit = await api('site', '/api/visits', {
+    method: 'POST',
+    body: JSON.stringify({
+      customer_id: customerSelect.value,
+      site_id: site.site_id,
+      channel: 'web',
+    }),
+  });
   activeCart = await api('shopping', '/api/carts', { method: 'POST', body: JSON.stringify({ customer_id: customerSelect.value, store_id: storeSelect.value, delivery_mode: deliverySelect.value, payment_status: 'pending' }) });
   for (const product of products) await api('shopping', `/api/carts/${activeCart.cart_id}/items`, { method: 'POST', body: JSON.stringify({ product_id: product.product_id, quantity: 1 + Math.floor(Math.random() * 3), unit_price: product.price_amount }) });
   advanceJourney(3);
-  feedbackElement.textContent = `Cart ${activeCart.cart_id.slice(0, 8)} created. Choose an outcome.`;
+  feedbackElement.textContent = `Visit ${activeVisit.visit_id.slice(0, 8)} and cart ${activeCart.cart_id.slice(0, 8)} created. Choose an outcome.`;
 }
 
 async function completeOutcome(outcome) {
@@ -290,6 +324,7 @@ function initializeLeftSidebarGroups() {
     orders: { kicker: 'Commerce widget', title: 'Shopping stats', widget: renderOrdersSidebar },
     customers: { kicker: 'CRM import', title: 'Load customers', nodes: [document.querySelector('#customers-view > .customer-heading'), document.querySelector('#customers-view > .customer-actions'), document.querySelector('#customers-view > .customer-preview'), document.querySelector('#import-customers'), document.querySelector('#customer-feedback')] },
     catalog: { kicker: 'Product import', title: 'Load catalog', nodes: [document.querySelector('#catalog-view .customer-import')] },
+    sites: { kicker: 'Site view', title: 'Session stats', widget: renderSitesSidebar },
     engagement: { kicker: 'Marketing import', title: 'Load campaigns', nodes: [document.querySelector('#engagement-view > .customer-import')] },
   };
 }
@@ -335,6 +370,11 @@ function renderOrdersSidebar() {
   const paid = orders.filter((order) => order.payment_status === 'succeeded').length;
   const failed = orders.filter((order) => order.payment_status === 'failed').length;
   return `${currentCustomerCard()}<div class="stat-grid"><div class="stat-card"><span>Total carts</span><strong>${cartTotal}</strong></div><div class="stat-card"><span>Total orders</span><strong>${orderTotal}</strong></div><div class="stat-card"><span>Paid on page</span><strong>${paid}</strong></div><div class="stat-card"><span>Failed on page</span><strong>${failed}</strong></div></div><p class="table-summary">The main table always shows page 1 with 20 carts and 20 orders.</p>`;
+}
+function renderSitesSidebar() {
+  const visitCount = visits.length;
+  const siteCount = sites.length;
+  return `${currentCustomerCard()}<div class="stat-grid"><div class="stat-card"><span>Sites</span><strong>${siteCount}</strong></div><div class="stat-card"><span>Visits</span><strong>${visitCount}</strong></div><div class="stat-card"><span>Likely links</span><strong>customer_id + site_id</strong></div><div class="stat-card"><span>Source</span><strong>site service</strong></div></div><p class="table-summary">Customer and order records connect by IDs; the site service owns visits and the site metadata.</p>`;
 }
 function syncCurrentCustomer(customerId) {
   currentCustomerId = customerId || '';
@@ -393,6 +433,18 @@ function showCartOrderDetail(type, id) {
   const summary = type === 'cart' ? `${record.status} · ${record.payment_status} · ${items.length} items` : `${record.status} · ${record.payment_status} · ${record.currency} ${Number(record.total_amount).toFixed(2)}`;
   openDetail(type === 'cart' ? 'Cart details' : 'Order details', type === 'cart' ? `Cart ${record.cart_id.slice(0, 8)}` : `Order ${record.order_id.slice(0, 8)}`, summary, [['Customer', customerDetailLabel(record.customer_id)], ['Created', formatDateTime(record.created_at)], ['Delivery', record.delivery_mode || '-'], ['Fulfilment', record.fulfillment_status || '-']], itemTable(items, type));
 }
+function showSiteDetail(id) {
+  const site = sites.find((item) => item.site_id === id);
+  if (!site) return;
+  const siteVisits = visits.filter((visit) => visit.site_id === site.site_id);
+  openDetail('Site details', site.name, `${site.type} · ${site.status}`, [['Site ID', site.site_id], ['City', site.city || '-'], ['Country', site.country || '-'], ['Opened', formatDateTime(site.opened_date)], ['Visit count', String(siteVisits.length)]], siteVisits.length ? `<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Channel</th><th>Started</th><th>Ended</th></tr></thead><tbody>${siteVisits.map((visit) => `<tr><td>${customerDetailLabel(visit.customer_id)}</td><td>${visit.channel}</td><td>${formatDateTime(visit.started_at)}</td><td>${formatDateTime(visit.ended_at)}</td></tr>`).join('')}</tbody></table></div>` : '');
+}
+function showVisitDetail(id) {
+  const visit = visits.find((item) => item.visit_id === id);
+  if (!visit) return;
+  const site = sites.find((item) => item.site_id === visit.site_id);
+  openDetail('Visit details', `Visit ${visit.visit_id.slice(0, 8)}`, `${visit.channel} session`, [['Customer', customerDetailLabel(visit.customer_id)], ['Site', site ? site.name : visit.site_id], ['Started', formatDateTime(visit.started_at)], ['Ended', formatDateTime(visit.ended_at)], ['Site type', site ? site.type : '-']]);
+}
 function showCustomerDetail(id) {
   const customer = loadedCustomers.find((item) => item.customer_id === id);
   if (!customer) return;
@@ -418,6 +470,8 @@ function showTableDetail(type, id) {
   if (type === 'cart' || type === 'order') showCartOrderDetail(type, id);
   if (type === 'customer') showCustomerDetail(id);
   if (type === 'catalog') showCatalogDetail(id);
+  if (type === 'site') showSiteDetail(id);
+  if (type === 'visit') showVisitDetail(id);
   if (type === 'campaign') showCampaignDetail(id);
   if (type === 'feedback') showFeedbackDetail(id);
 }
@@ -449,6 +503,33 @@ function renderEngagementData() {
   const campaignNames = new Map(campaigns.map((campaign) => [campaign.campaign_id, campaign.name]));
   document.querySelector('#feedback-table-body').innerHTML = feedbackRecords.slice(-25).reverse().map((record) => `<tr class="clickable-row" data-record-type="feedback" data-record-id="${record.feedback_id}"><td>${customerDetailLabel(record.customer_id)}</td><td>${campaignNames.get(record.campaign_id) || record.campaign_id || '-'}</td><td>${record.source}</td><td>${record.rating}</td><td>${record.sentiment}</td><td>${record.status}</td></tr>`).join('') || '<tr><td colspan="6" class="table-message">No feedback found.</td></tr>';
   document.querySelector('#engagement-state').textContent = `${campaigns.length} campaigns · ${feedbackRecords.length} feedback`;
+}
+function renderSiteCustomerFilter() {
+  const selectedCustomer = document.querySelector('#sites-customer-filter').value || currentCustomerId;
+  document.querySelector('#sites-customer-filter').innerHTML = '<option value="">All customers</option>' + loadedCustomers.map((customer) => `<option value="${customer.customer_id}">${customer.first_name} ${customer.last_name} · ${customer.email}</option>`).join('');
+  document.querySelector('#sites-customer-filter').value = loadedCustomers.some((customer) => customer.customer_id === selectedCustomer) ? selectedCustomer : '';
+}
+function renderSiteData() {
+  const customerLabels = new Map(loadedCustomers.map((customer) => [customer.customer_id, `${customer.first_name} ${customer.last_name}<br><span class="muted-cell">${customer.email}</span>`]));
+  const siteVisitCounts = new Map();
+  for (const visit of visits) siteVisitCounts.set(visit.site_id, (siteVisitCounts.get(visit.site_id) || 0) + 1);
+  document.querySelector('#site-table-body').innerHTML = sites.map((site) => `<tr class="clickable-row" data-record-type="site" data-record-id="${site.site_id}"><td><strong>${site.name}</strong></td><td>${site.type}</td><td>${site.city || '-'}</td><td>${site.status}</td><td>${siteVisitCounts.get(site.site_id) || 0}</td></tr>`).join('') || '<tr><td colspan="5" class="table-message">No sites found.</td></tr>';
+  document.querySelector('#visit-table-body').innerHTML = visits.map((visit) => `<tr class="clickable-row" data-record-type="visit" data-record-id="${visit.visit_id}"><td><strong>${visit.visit_id.slice(0, 8)}</strong></td><td>${customerLabels.get(visit.customer_id) || visit.customer_id}</td><td>${sites.find((site) => site.site_id === visit.site_id)?.name || visit.site_id}</td><td>${visit.channel}</td><td>${formatDateTime(visit.started_at)}</td><td>${formatDateTime(visit.ended_at)}</td></tr>`).join('') || '<tr><td colspan="6" class="table-message">No visits found.</td></tr>';
+  document.querySelector('#sites-state').textContent = `${sites.length} sites · ${visits.length} visits`;
+}
+async function loadSiteData() {
+  const selectedCustomer = document.querySelector('#sites-customer-filter') ? document.querySelector('#sites-customer-filter').value : '';
+  const [siteList, visitList, customerResult] = await Promise.all([
+    api('site', '/api/sites'),
+    api('site', selectedCustomer ? `/api/visits?customer_id=${encodeURIComponent(selectedCustomer)}` : '/api/visits'),
+    api('crm', '/api/customers?page=1&page_size=100'),
+  ]);
+  loadedCustomers = customerResult.items;
+  sites = siteList;
+  visits = visitList;
+  renderSiteCustomerFilter();
+  renderSiteData();
+  document.querySelector('#sites-feedback').textContent = 'Site and visit records loaded.';
 }
 async function loadEngagementData() {
   const result = await api('crm', '/api/customers?page=1&page_size=100'); loadedCustomers = result.items; renderJourneyCustomers();
@@ -536,6 +617,8 @@ document.querySelector('#submit-feedback').addEventListener('click', () => submi
 document.querySelector('#simulate-feedback').addEventListener('click', () => simulateFeedback().catch((error) => { document.querySelector('#feedback-flow-feedback').textContent = error.message; }));
 document.querySelector('#simulate-engagement-batch').addEventListener('click', () => simulateEngagementBatch().catch((error) => { document.querySelector('#marketing-flow-feedback').textContent = error.message; }));
 document.querySelector('#refresh-engagement').addEventListener('click', () => loadEngagementData().catch((error) => { document.querySelector('#engagement-feedback').textContent = error.message; }));
+document.querySelector('#refresh-sites').addEventListener('click', () => loadSiteData().catch((error) => { document.querySelector('#sites-feedback').textContent = error.message; }));
+document.querySelector('#sites-customer-filter').addEventListener('change', () => loadSiteData().catch((error) => { document.querySelector('#sites-feedback').textContent = error.message; }));
 document.querySelector('#refresh-customers').addEventListener('click', () => loadCustomers().catch(() => {}));
 document.querySelector('#refresh-orders').addEventListener('click', () => loadCartOrderData().catch((error) => { document.querySelector('#orders-feedback').textContent = error.message; }));
 document.querySelector('#orders-customer-filter').addEventListener('change', () => { syncCurrentCustomer(document.querySelector('#orders-customer-filter').value); loadCartOrderData().catch((error) => { document.querySelector('#orders-feedback').textContent = error.message; }); });
@@ -545,6 +628,8 @@ document.querySelector('#cart-table-body').addEventListener('click', (event) => 
 document.querySelector('#order-table-body').addEventListener('click', (event) => { const row = event.target.closest('[data-record-type]'); if (row) showTableDetail(row.dataset.recordType, row.dataset.recordId); });
 document.querySelector('#customer-table-body').addEventListener('click', (event) => { const row = event.target.closest('[data-record-type]'); if (row) showTableDetail(row.dataset.recordType, row.dataset.recordId); });
 document.querySelector('#catalog-table-body').addEventListener('click', (event) => { const row = event.target.closest('[data-record-type]'); if (row) showTableDetail(row.dataset.recordType, row.dataset.recordId); });
+document.querySelector('#site-table-body').addEventListener('click', (event) => { const row = event.target.closest('[data-record-type]'); if (row) showTableDetail(row.dataset.recordType, row.dataset.recordId); });
+document.querySelector('#visit-table-body').addEventListener('click', (event) => { const row = event.target.closest('[data-record-type]'); if (row) showTableDetail(row.dataset.recordType, row.dataset.recordId); });
 document.querySelector('#campaign-table-body').addEventListener('click', (event) => { const row = event.target.closest('[data-record-type]'); if (row) showTableDetail(row.dataset.recordType, row.dataset.recordId); });
 document.querySelector('#feedback-table-body').addEventListener('click', (event) => { const row = event.target.closest('[data-record-type]'); if (row) showTableDetail(row.dataset.recordType, row.dataset.recordId); });
 document.querySelector('#close-record-detail').addEventListener('click', () => { document.querySelector('#record-detail-panel').hidden = true; });

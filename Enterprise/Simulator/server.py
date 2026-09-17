@@ -9,6 +9,7 @@ ROOT = Path(__file__).parent
 CRM_ORIGIN = "http://127.0.0.1:8001"
 PRODUCT_ORIGIN = "http://127.0.0.1:8002"
 SHOPPING_ORIGIN = "http://127.0.0.1:8003"
+SITE_ORIGIN = "http://127.0.0.1:8004"
 FEEDBACK_ORIGIN = "http://127.0.0.1:8005"
 MARKETING_ORIGIN = "http://127.0.0.1:8006"
 
@@ -17,6 +18,7 @@ PROXY_ORIGINS = {
     "crm": CRM_ORIGIN,
     "product": PRODUCT_ORIGIN,
     "shopping": SHOPPING_ORIGIN,
+    "site": SITE_ORIGIN,
     "feedback": FEEDBACK_ORIGIN,
     "marketing": MARKETING_ORIGIN,
 }
