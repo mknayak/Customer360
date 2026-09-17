@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 
-from .models import Cart, CartCreate, CartItem, CartItemCreate, CartUpdate, CartView, Order, OrderCreate, OrderItem, OrderUpdate
+from .models import Cart, CartCreate, CartItem, CartItemCreate, CartPage, CartUpdate, CartView, Order, OrderCreate, OrderItem, OrderPage, OrderUpdate
 from .repository import ShoppingRepository
 
 app = FastAPI(title="Customer360 Shopping Service", version="0.1.0")
@@ -33,6 +33,20 @@ def health() -> dict[str, str]:
 def create_cart(payload: CartCreate) -> CartView:
     cart = repository.save_cart(Cart(**payload.model_dump()))
     return CartView(**cart.model_dump())
+
+
+@app.get("/api/carts", response_model=CartPage)
+def list_carts(
+    customer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> CartPage:
+    items = repository.list_carts(customer_id=customer_id, start_date=start_date, end_date=end_date, page=page, page_size=page_size)
+    total = repository.count_carts(customer_id=customer_id, start_date=start_date, end_date=end_date)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    return CartPage(items=items, page=page, page_size=page_size, total=total, total_pages=total_pages)
 
 
 @app.get("/api/carts/{cart_id}", response_model=CartView)
@@ -88,9 +102,18 @@ def create_order(payload: OrderCreate) -> Order:
     return repository.save_order(Order(order_id=order_id, customer_id=payload.customer_id, site_id=payload.site_id, promotion_id=payload.promotion_id, total_amount=round(total, 2), currency=payload.currency, status=order_status, payment_status=payload.payment_status, payment_method=payload.payment_method, transaction_id=payload.transaction_id, failure_reason=payload.failure_reason, paid_at=paid_at, store_id=payload.store_id, delivery_mode=payload.delivery_mode, delivery_address=payload.delivery_address, fulfillment_status=fulfillment_status, items=items))
 
 
-@app.get("/api/orders", response_model=list[Order])
-def list_orders() -> list[Order]:
-    return repository.list_orders()
+@app.get("/api/orders", response_model=OrderPage)
+def list_orders(
+    customer_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> OrderPage:
+    items = repository.list_orders(customer_id=customer_id, start_date=start_date, end_date=end_date, page=page, page_size=page_size)
+    total = repository.count_orders(customer_id=customer_id, start_date=start_date, end_date=end_date)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    return OrderPage(items=items, page=page, page_size=page_size, total=total, total_pages=total_pages)
 
 
 @app.get("/api/orders/{order_id}", response_model=Order)

@@ -13,6 +13,14 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 service_pids=()
+services=(
+  "crm|crm_service.app:app|8001|crm_service/app.py"
+  "product|product_service.app:app|8002|product_service/app.py"
+  "shopping|shopping_service.app:app|8003|shopping_service/app.py"
+  "site|site_service.app:app|8004|site_service/app.py"
+  "feedback|feedback_service.app:app|8005|feedback_service/app.py"
+  "marketing|marketing_service.app:app|8006|marketing_service/app.py"
+)
 
 free_port() {
   local port="$1"
@@ -82,12 +90,10 @@ start_simulator() {
   service_pids+=("$!")
 }
 
-start_service crm crm_service.app:app 8001 crm_service/app.py
-start_service product product_service.app:app 8002 product_service/app.py
-start_service shopping shopping_service.app:app 8003 shopping_service/app.py
-start_service site site_service.app:app 8004 site_service/app.py
-start_service feedback feedback_service.app:app 8005 feedback_service/app.py
-start_service marketing marketing_service.app:app 8006 marketing_service/app.py
+for service in "${services[@]}"; do
+  IFS="|" read -r name module port module_file <<< "$service"
+  start_service "$name" "$module" "$port" "$module_file"
+done
 start_simulator
 
 if [[ ${#service_pids[@]} -eq 0 ]]; then

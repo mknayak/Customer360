@@ -1,0 +1,7 @@
+campaign_name,objective,status,start_date,end_date,budget_amount,currency,audience_name,segment,criteria_key,criteria_value,channel_name,channel_type,provider,allocation_percent
+Winback coffee club,Reactivate quiet customers,scheduled,2026-10-01T09:00:00Z,2026-10-31T23:59:59Z,12000,USD,Lapsed loyalists,lapsed_90_days,preferred_category,coffee,Lifecycle email,email,Northstar Mail,70
+Winback coffee club,Reactivate quiet customers,scheduled,2026-10-01T09:00:00Z,2026-10-31T23:59:59Z,12000,USD,Lapsed loyalists,lapsed_90_days,preferred_category,coffee,Mobile push,push,Northstar App,30
+Store pickup nudge,Increase collect-at-store conversion,active,2026-09-20T08:00:00Z,2026-10-15T23:59:59Z,7500,USD,Local shoppers,store_radius,delivery_preference,collect_at_store,In-store signage,in_store,Northstar Retail,40
+Store pickup nudge,Increase collect-at-store conversion,active,2026-09-20T08:00:00Z,2026-10-15T23:59:59Z,7500,USD,Local shoppers,store_radius,delivery_preference,collect_at_store,SMS reminder,sms,Northstar Messaging,60
+New product launch,Drive awareness for new arrivals,draft,2026-11-01T09:00:00Z,2026-11-20T23:59:59Z,18000,USD,High intent browsers,viewed_product,category,kitchenware,Paid social,social,Northstar Social,50
+New product launch,Drive awareness for new arrivals,draft,2026-11-01T09:00:00Z,2026-11-20T23:59:59Z,18000,USD,High intent browsers,viewed_product,category,kitchenware,Web personalization,web,Northstar Site,50

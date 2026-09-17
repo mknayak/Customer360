@@ -63,6 +63,14 @@ class CartView(Cart):
     items: list[CartItem] = Field(default_factory=list)
 
 
+class CartPage(BaseModel):
+    items: list[CartView]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
 class OrderItemCreate(BaseModel):
     product_id: str
     quantity: int = Field(gt=0)
@@ -113,3 +121,11 @@ class Order(BaseModel):
     fulfillment_status: str = "not_started"
     created_at: datetime = Field(default_factory=utc_now)
     items: list[OrderItem] = Field(default_factory=list)
+
+
+class OrderPage(BaseModel):
+    items: list[Order]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int

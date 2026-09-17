@@ -69,6 +69,55 @@ class ShoppingRepository:
             return None
         return CartView(**self.cart(cart_row).model_dump(), items=[self.cart_item(row) for row in item_rows])
 
+    def list_carts(
+        self,
+        customer_id: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> list[CartView]:
+        clauses = []
+        parameters: list[str] = []
+        if customer_id:
+            clauses.append("customer_id = ?")
+            parameters.append(customer_id)
+        if start_date:
+            clauses.append("created_at >= ?")
+            parameters.append(start_date.isoformat())
+        if end_date:
+            clauses.append("created_at <= ?")
+            parameters.append(end_date.isoformat())
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        limit = ""
+        if page is not None and page_size is not None:
+            limit = " LIMIT ? OFFSET ?"
+            parameters.extend([str(page_size), str((page - 1) * page_size)])
+        with self.lock:
+            ids = [row[0] for row in self.connection.execute(f"SELECT cart_id FROM carts {where} ORDER BY created_at{limit}", parameters)]
+        return [self.get_cart(cart_id) for cart_id in ids]
+
+    def count_carts(
+        self,
+        customer_id: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> int:
+        clauses = []
+        parameters: list[str] = []
+        if customer_id:
+            clauses.append("customer_id = ?")
+            parameters.append(customer_id)
+        if start_date:
+            clauses.append("created_at >= ?")
+            parameters.append(start_date.isoformat())
+        if end_date:
+            clauses.append("created_at <= ?")
+            parameters.append(end_date.isoformat())
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self.lock:
+            return self.connection.execute(f"SELECT COUNT(*) FROM carts {where}", parameters).fetchone()[0]
+
     def save_item(self, item: CartItem) -> CartItem:
         with self.lock, self.connection:
             self.connection.execute("INSERT OR REPLACE INTO cart_items VALUES (?, ?, ?, ?, ?)", (item.cart_item_id, item.cart_id, item.product_id, item.quantity, item.unit_price))
@@ -96,10 +145,54 @@ class ShoppingRepository:
         data["items"] = [OrderItem(**dict(item_row)) for item_row in item_rows]
         return Order(**data)
 
-    def list_orders(self) -> list[Order]:
+    def list_orders(
+        self,
+        customer_id: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> list[Order]:
+        clauses = []
+        parameters: list[str] = []
+        if customer_id:
+            clauses.append("customer_id = ?")
+            parameters.append(customer_id)
+        if start_date:
+            clauses.append("created_at >= ?")
+            parameters.append(start_date.isoformat())
+        if end_date:
+            clauses.append("created_at <= ?")
+            parameters.append(end_date.isoformat())
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        limit = ""
+        if page is not None and page_size is not None:
+            limit = " LIMIT ? OFFSET ?"
+            parameters.extend([str(page_size), str((page - 1) * page_size)])
         with self.lock:
-            ids = [row[0] for row in self.connection.execute("SELECT order_id FROM orders ORDER BY created_at")]
+            ids = [row[0] for row in self.connection.execute(f"SELECT order_id FROM orders {where} ORDER BY created_at{limit}", parameters)]
         return [self.get_order(order_id) for order_id in ids]
+
+    def count_orders(
+        self,
+        customer_id: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> int:
+        clauses = []
+        parameters: list[str] = []
+        if customer_id:
+            clauses.append("customer_id = ?")
+            parameters.append(customer_id)
+        if start_date:
+            clauses.append("created_at >= ?")
+            parameters.append(start_date.isoformat())
+        if end_date:
+            clauses.append("created_at <= ?")
+            parameters.append(end_date.isoformat())
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self.lock:
+            return self.connection.execute(f"SELECT COUNT(*) FROM orders {where}", parameters).fetchone()[0]
 
     def update_order(self, order_id: str, status: str) -> Order | None:
         with self.lock, self.connection:

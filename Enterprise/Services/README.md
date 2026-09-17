@@ -49,5 +49,5 @@ Enterprise/Services/<service>/
 |-- README.md
 ```
 
-The first implementation slices are CRM, Product, and Shopping. Site, Feedback,
-and Marketing remain planned service boundaries.
+The first implementation slices are CRM, Product, Shopping, Feedback, and
+Marketing. Site remains a planned service boundary.

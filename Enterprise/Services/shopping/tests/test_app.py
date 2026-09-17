@@ -16,9 +16,17 @@ def test_cart_and_order_api(monkeypatch, tmp_path):
     item = client.post(f"/api/carts/{cart_id}/items", json={"product_id": "product-1", "quantity": 2, "unit_price": 10})
     assert item.status_code == 201
     assert len(client.get(f"/api/carts/{cart_id}").json()["items"]) == 1
+    carts = client.get("/api/carts?customer_id=customer-1&page=1&page_size=20").json()
+    assert carts["total"] == 1
+    assert carts["page_size"] == 20
+    assert carts["items"][0]["cart_id"] == cart_id
     order = client.post("/api/orders", json={"customer_id": "customer-1", "currency": "USD", "items": [{"product_id": "product-1", "quantity": 2, "unit_price": 10}]})
     assert order.status_code == 201
     assert order.json()["total_amount"] == 20
+    orders = client.get("/api/orders?customer_id=customer-1&page=1&page_size=20").json()
+    assert orders["total"] == 1
+    assert orders["page_size"] == 20
+    assert orders["items"][0]["order_id"] == order.json()["order_id"]
     repository.close()
 
 
