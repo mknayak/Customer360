@@ -12,6 +12,8 @@ SHOPPING_ORIGIN = "http://127.0.0.1:8003"
 SITE_ORIGIN = "http://127.0.0.1:8004"
 FEEDBACK_ORIGIN = "http://127.0.0.1:8005"
 MARKETING_ORIGIN = "http://127.0.0.1:8006"
+EVENTS_ORIGIN = "http://127.0.0.1:8007"
+ORCHESTRATION_ORIGIN = "http://127.0.0.1:8008"
 
 
 PROXY_ORIGINS = {
@@ -21,6 +23,8 @@ PROXY_ORIGINS = {
     "site": SITE_ORIGIN,
     "feedback": FEEDBACK_ORIGIN,
     "marketing": MARKETING_ORIGIN,
+    "events": EVENTS_ORIGIN,
+    "orchestration": ORCHESTRATION_ORIGIN,
 }
 
 

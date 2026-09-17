@@ -25,6 +25,8 @@ directories.
 | `site` | Physical and digital sites plus visits | `SiteCreated`, `VisitStarted`, `VisitEnded` |
 | `feedback` | Customer feedback and ratings | `FeedbackSubmitted`, `FeedbackUpdated` |
 | `marketing` | Campaigns, audiences, and channels | `CampaignCreated`, `CampaignStarted`, `CampaignEnded` |
+| `events` | Immutable event envelopes and event queries | Event storage and replay |
+| `orchestration` | Multi-service workflow coordination | WorkflowStarted, WorkflowCompleted, WorkflowFailed |
 
 ## Boundary rules
 
@@ -49,5 +51,6 @@ Enterprise/Services/<service>/
 |-- README.md
 ```
 
-The first implementation slices are CRM, Product, Shopping, Feedback, and
-Marketing. Site remains a planned service boundary.
+The operational implementation slices are CRM, Product, Shopping, Site,
+Feedback, and Marketing. Events and Orchestration are infrastructure services:
+they do not own domain records and must call domain services through APIs.

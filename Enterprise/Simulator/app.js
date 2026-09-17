@@ -31,14 +31,23 @@ let catalogDirectoryRows = [];
 let currentCustomerId = '';
 let sites = [];
 let visits = [];
+let events = [];
 let activeSite = null;
 let activeVisit = null;
+let workflowCorrelationId = null;
 
 const api = async (service, path, options = {}) => {
   const response = await fetch(`/${service}${path}`, { headers: { 'Content-Type': 'application/json' }, ...options });
   if (!response.ok) throw new Error(`${service} rejected request: ${response.status}`);
   return response.status === 204 ? null : response.json();
 };
+
+async function recordEvent(sourceService, eventType, aggregateType, aggregateId, payload, correlationId = workflowCorrelationId || crypto.randomUUID()) {
+  return api('events', '/api/events', {
+    method: 'POST',
+    body: JSON.stringify({ source_service: sourceService, event_type: eventType, aggregate_type: aggregateType, aggregate_id: aggregateId, payload, correlation_id: correlationId }),
+  });
+}
 
 function renderSteps() {
   stepsElement.innerHTML = steps.map((step, index) => `<div class="step ${index <= currentStep ? 'done' : ''}"><span class="step-index">${index <= currentStep ? '✓' : String(index + 1).padStart(2, '0')}</span><span>${step}</span></div>`).join('');
@@ -97,6 +106,7 @@ async function ensureSite() {
         status: 'active',
       }),
     });
+    await recordEvent('site', 'SiteCreated', 'site', site.site_id, { name: site.name, type: site.type });
   }
   activeSite = site;
   return site;
@@ -186,27 +196,31 @@ async function startVisit() {
   const products = selectedProducts();
   if (!customerSelect.value || !products.length) { feedbackElement.textContent = 'Select a customer and at least one available product.'; return; }
   const site = await ensureSite();
-  activeVisit = await api('site', '/api/visits', {
+  const workflow = await api('orchestration', '/api/workflows/shopping-journey', {
     method: 'POST',
     body: JSON.stringify({
       customer_id: customerSelect.value,
       site_id: site.site_id,
-      channel: 'web',
+      store_id: storeSelect.value,
+      delivery_mode: deliverySelect.value,
+      items: products.map((product) => ({ product_id: product.product_id, quantity: 1 + Math.floor(Math.random() * 3), unit_price: product.price_amount })),
     }),
   });
-  activeCart = await api('shopping', '/api/carts', { method: 'POST', body: JSON.stringify({ customer_id: customerSelect.value, store_id: storeSelect.value, delivery_mode: deliverySelect.value, payment_status: 'pending' }) });
-  for (const product of products) await api('shopping', `/api/carts/${activeCart.cart_id}/items`, { method: 'POST', body: JSON.stringify({ product_id: product.product_id, quantity: 1 + Math.floor(Math.random() * 3), unit_price: product.price_amount }) });
+  workflowCorrelationId = workflow.correlation_id;
+  activeVisit = { visit_id: workflow.visit_id, site_id: site.site_id, customer_id: customerSelect.value, channel: 'web' };
+  activeCart = { cart_id: workflow.cart_id, customer_id: customerSelect.value, store_id: storeSelect.value, delivery_mode: deliverySelect.value };
   advanceJourney(3);
-  feedbackElement.textContent = `Visit ${activeVisit.visit_id.slice(0, 8)} and cart ${activeCart.cart_id.slice(0, 8)} created. Choose an outcome.`;
+  feedbackElement.textContent = `Workflow ${workflow.correlation_id.slice(0, 8)} created visit ${activeVisit.visit_id.slice(0, 8)} and cart ${activeCart.cart_id.slice(0, 8)}. Choose an outcome.`;
 }
 
 async function completeOutcome(outcome) {
   if (!activeCart) { feedbackElement.textContent = 'Start a visit first.'; return; }
-  if (outcome === 'abandon') { await api('shopping', `/api/carts/${activeCart.cart_id}`, { method: 'PUT', body: JSON.stringify({ status: 'abandoned' }) }); advanceJourney(3); feedbackElement.textContent = 'Cart abandoned and recorded.'; return; }
+  if (outcome === 'abandon') { await api('shopping', `/api/carts/${activeCart.cart_id}`, { method: 'PUT', body: JSON.stringify({ status: 'abandoned' }) }); await recordEvent('shopping', 'CartAbandoned', 'cart', activeCart.cart_id, { customer_id: activeCart.customer_id }); advanceJourney(3); feedbackElement.textContent = 'Cart abandoned and recorded.'; return; }
   if (outcome === 'cancel_pending' || outcome === 'cancelled') {
     if (!activeOrder) { feedbackElement.textContent = 'Create a successful order before simulating cancellation.'; return; }
     const status = outcome === 'cancel_pending' ? 'pending_cancellation' : 'cancelled';
     activeOrder = await api('shopping', `/api/orders/${activeOrder.order_id}`, { method: 'PUT', body: JSON.stringify({ status }) });
+    await recordEvent('shopping', 'OrderStatusChanged', 'order', activeOrder.order_id, { customer_id: activeOrder.customer_id, status });
     feedbackElement.textContent = `Order ${status.replaceAll('_', ' ')}.`;
     return;
   }
@@ -214,6 +228,7 @@ async function completeOutcome(outcome) {
   const payment = { purchase: { payment_status: 'succeeded', payment_method: 'card', transaction_id: `txn-${crypto.randomUUID()}` }, pending: { payment_status: 'pending', payment_method: 'card' }, failure: { payment_status: 'failed', payment_method: 'card', failure_reason: 'simulated_decline' } }[outcome];
   const order = await api('shopping', '/api/orders', { method: 'POST', body: JSON.stringify({ customer_id: cart.customer_id, store_id: cart.store_id, delivery_mode: cart.delivery_mode, currency: 'USD', items: cart.items.map((item) => ({ product_id: item.product_id, quantity: item.quantity, unit_price: item.unit_price })), ...payment }) });
   activeOrder = order;
+  await recordEvent('shopping', 'OrderCreated', 'order', order.order_id, { customer_id: order.customer_id, cart_id: activeCart.cart_id, status: order.status, payment_status: order.payment_status });
   advanceJourney(outcome === 'purchase' ? 5 : 4);
   feedbackElement.textContent = `${order.status.replaceAll('_', ' ')} · ${order.payment_status} · ${order.total_amount} ${order.currency}`;
 }
@@ -267,7 +282,7 @@ function showCampaignPreview(rows) { pendingCampaigns = rows; const validationEr
 async function loadBundledCsv() { const response = await fetch('/data/customers.csv'); showCustomerPreview(parseCsv(await response.text())); document.querySelector('#customer-file-name').textContent = 'customers.csv'; }
 async function loadBundledCatalog() { const response = await fetch('/data/catalog.csv'); showCatalogPreview(parseCsv(await response.text())); document.querySelector('#catalog-file-name').textContent = 'catalog.csv'; }
 async function loadBundledCampaigns() { const response = await fetch('/data/campaigns.csv'); showCampaignPreview(parseCsv(await response.text())); document.querySelector('#campaign-file-name').textContent = 'campaigns.csv'; }
-async function importCustomers() { const button = document.querySelector('#import-customers'); button.disabled = true; for (let start = 0; start < pendingCustomers.length; start += 500) await api('crm', '/api/customers/bulk', { method: 'POST', body: JSON.stringify(pendingCustomers.slice(start, start + 500)) }); document.querySelector('#customer-feedback').textContent = `Imported ${pendingCustomers.length.toLocaleString()} customers.`; await loadCustomers(); await loadJourneyData(); }
+async function importCustomers() { const button = document.querySelector('#import-customers'); button.disabled = true; for (let start = 0; start < pendingCustomers.length; start += 500) await api('crm', '/api/customers/bulk', { method: 'POST', body: JSON.stringify(pendingCustomers.slice(start, start + 500)) }); await recordEvent('crm', 'CustomersImported', 'customer_batch', crypto.randomUUID(), { count: pendingCustomers.length }); document.querySelector('#customer-feedback').textContent = `Imported ${pendingCustomers.length.toLocaleString()} customers.`; await loadCustomers(); await loadJourneyData(); }
 async function importCatalog() {
   const button = document.querySelector('#import-catalog'); button.disabled = true;
   const validationError = validateCatalogRows(pendingCatalog); if (validationError) throw new Error(validationError);
@@ -289,7 +304,10 @@ async function importCatalog() {
     await api('product', `/api/stores/${store.store_id}/catalog`, { method: 'POST', body: JSON.stringify({ product_id: product.product_id, price_amount: Number(row.price_amount), currency: row.currency || 'USD', status: row.catalog_status || 'active' }) });
     await api('product', `/api/stores/${store.store_id}/inventory`, { method: 'POST', body: JSON.stringify({ product_id: product.product_id, quantity: Number(row.quantity), reserved_quantity: Number(row.reserved_quantity || 0) }) });
   }
-  document.querySelector('#catalog-feedback').textContent = `Imported ${pendingCatalog.length.toLocaleString()} catalog rows.`; await loadJourneyData();
+  await recordEvent('product', 'CatalogImported', 'catalog_batch', crypto.randomUUID(), { rows: pendingCatalog.length, products: productsBySku.size, stores: storesByName.size }); document.querySelector('#catalog-feedback').textContent = `Imported ${pendingCatalog.length.toLocaleString()} catalog rows.`; await loadJourneyData();
+  await recordEvent('marketing', 'CampaignsImported', 'campaign_batch', crypto.randomUUID(), { rows: pendingCampaigns.length });
+  await recordEvent('marketing', 'CampaignInteractionRecorded', 'campaign_interaction', interaction.interaction_id, { customer_id: customerId, campaign_id: campaignId, event_type: eventType });
+  await recordEvent('feedback', 'FeedbackSubmitted', 'feedback', record.feedback_id, { customer_id: record.customer_id, campaign_id: record.campaign_id, rating: record.rating, sentiment: record.sentiment });
 }
 async function loadCustomers() { const search = encodeURIComponent(document.querySelector('#customer-search').value.trim()); const result = await api('crm', `/api/customers?page=${customerPage}&page_size=100&search=${search}`); loadedCustomers = result.items; customerTotal = result.total; customerTotalPages = result.total_pages; renderJourneyCustomers(); const body = document.querySelector('#customer-table-body'); body.innerHTML = loadedCustomers.map((customer) => `<tr class="clickable-row" data-record-type="customer" data-record-id="${customer.customer_id}"><td><strong>${customer.first_name} ${customer.last_name}</strong></td><td>${customer.email}</td><td>${customer.city || '-'}, ${customer.country || '-'}</td><td>${customer.status}</td><td>${customer.preferred_channel || '-'}</td></tr>`).join('') || '<tr><td colspan="5" class="table-message">No customers match this search.</td></tr>'; document.querySelector('#customer-table-summary').textContent = `${loadedCustomers.length} shown of ${customerTotal} customers`; document.querySelector('#customer-page-label').textContent = `Page ${customerPage} of ${customerTotalPages}`; document.querySelector('#previous-customers').disabled = customerPage <= 1; document.querySelector('#next-customers').disabled = customerPage >= customerTotalPages; }
 function formatDateTime(value) {
@@ -326,6 +344,7 @@ function initializeLeftSidebarGroups() {
     catalog: { kicker: 'Product import', title: 'Load catalog', nodes: [document.querySelector('#catalog-view .customer-import')] },
     sites: { kicker: 'Site view', title: 'Session stats', widget: renderSitesSidebar },
     engagement: { kicker: 'Marketing import', title: 'Load campaigns', nodes: [document.querySelector('#engagement-view > .customer-import')] },
+    events: { kicker: 'Event backbone', title: 'Stream stats', widget: renderEventsSidebar },
   };
 }
 function restoreLeftSidebarNodes() {
@@ -375,6 +394,13 @@ function renderSitesSidebar() {
   const visitCount = visits.length;
   const siteCount = sites.length;
   return `${currentCustomerCard()}<div class="stat-grid"><div class="stat-card"><span>Sites</span><strong>${siteCount}</strong></div><div class="stat-card"><span>Visits</span><strong>${visitCount}</strong></div><div class="stat-card"><span>Likely links</span><strong>customer_id + site_id</strong></div><div class="stat-card"><span>Source</span><strong>site service</strong></div></div><p class="table-summary">Customer and order records connect by IDs; the site service owns visits and the site metadata.</p>`;
+}
+function renderEventsSidebar() {
+  const sourceCount = new Set(events.map((event) => event.source_service)).size;
+  const typeCount = new Set(events.map((event) => event.event_type)).size;
+  const correlationCount = new Set(events.map((event) => event.correlation_id).filter(Boolean)).size;
+  const filter = document.querySelector('#events-correlation-filter')?.value || 'All workflows';
+  return `<div class="stat-grid"><div class="stat-card"><span>Events loaded</span><strong>${events.length}</strong></div><div class="stat-card"><span>Sources</span><strong>${sourceCount}</strong></div><div class="stat-card"><span>Event types</span><strong>${typeCount}</strong></div><div class="stat-card"><span>Correlations</span><strong>${correlationCount}</strong></div></div><p class="table-summary">Filter: ${filter}</p><p class="table-summary">Events are immutable records linked by correlation ID.</p>`;
 }
 function syncCurrentCustomer(customerId) {
   currentCustomerId = customerId || '';
@@ -531,6 +557,17 @@ async function loadSiteData() {
   renderSiteData();
   document.querySelector('#sites-feedback').textContent = 'Site and visit records loaded.';
 }
+function renderEventData() {
+  document.querySelector('#events-table-body').innerHTML = events.map((event) => `<tr class="clickable-row" data-record-type="event" data-record-id="${event.event_id}"><td>${formatDateTime(event.recorded_at)}</td><td><strong>${event.event_type}</strong></td><td>${event.source_service}</td><td>${event.aggregate_type} · ${event.aggregate_id.slice(0, 8)}</td><td>${event.correlation_id || '-'}</td><td><code>${JSON.stringify(event.payload)}</code></td></tr>`).join('') || '<tr><td colspan="6" class="table-message">No events found.</td></tr>';
+  document.querySelector('#events-state').textContent = `${events.length} events`;
+  if (document.querySelector('.tab.active')?.dataset.tab === 'events') activateLeftSidebar('events');
+}
+async function loadEventData() {
+  const correlationId = document.querySelector('#events-correlation-filter').value.trim();
+  events = await api('events', `/api/events?limit=100${correlationId ? `&correlation_id=${encodeURIComponent(correlationId)}` : ''}`);
+  renderEventData();
+  document.querySelector('#events-feedback').textContent = 'Event records loaded.';
+}
 async function loadEngagementData() {
   const result = await api('crm', '/api/customers?page=1&page_size=100'); loadedCustomers = result.items; renderJourneyCustomers();
   [campaigns, channels, feedbackRecords] = await Promise.all([api('marketing', '/api/campaigns'), api('marketing', '/api/channels'), api('feedback', '/api/feedback')]);
@@ -578,6 +615,7 @@ async function simulateFeedback() {
   for (let index = 0; index < size; index += 1) {
     const payload = simulatedFeedbackPayload(randomItem(availableCustomers), availableCampaigns.length ? randomItem(availableCampaigns) : null);
     const record = await api('feedback', '/api/feedback', { method: 'POST', body: JSON.stringify(payload) });
+    await recordEvent('feedback', 'FeedbackSubmitted', 'feedback', record.feedback_id, { customer_id: record.customer_id, campaign_id: record.campaign_id, rating: record.rating, sentiment: record.sentiment });
     counts[record.sentiment] += 1;
     document.querySelector('#feedback-flow-feedback').textContent = `Simulated ${index + 1} of ${size} feedback records.`;
   }
@@ -590,8 +628,9 @@ async function simulateEngagementBatch() {
   const events = ['sent', 'delivered', 'opened', 'clicked', 'converted', 'opted_out']; const sentiments = ['positive', 'neutral', 'negative', 'mixed'];
   for (let index = 0; index < size; index += 1) {
     const customer = loadedCustomers[Math.floor(Math.random() * loadedCustomers.length)]; const campaign = campaigns[Math.floor(Math.random() * campaigns.length)]; const channel = channels[Math.floor(Math.random() * channels.length)]; const eventType = events[Math.floor(Math.random() * events.length)];
-    await api('marketing', `/api/campaigns/${campaign.campaign_id}/interactions`, { method: 'POST', body: JSON.stringify({ customer_id: customer.customer_id, event_type: eventType, channel_id: channel?.channel_id || null, detail: 'simulator_batch_touch' }) });
-    if (Math.random() < 0.4) await api('feedback', '/api/feedback', { method: 'POST', body: JSON.stringify({ customer_id: customer.customer_id, campaign_id: campaign.campaign_id, source: 'survey', rating: 1 + Math.floor(Math.random() * 5), sentiment: sentiments[Math.floor(Math.random() * sentiments.length)], comment: `Batch ${eventType} response for ${campaign.name}` }) });
+    const interaction = await api('marketing', `/api/campaigns/${campaign.campaign_id}/interactions`, { method: 'POST', body: JSON.stringify({ customer_id: customer.customer_id, event_type: eventType, channel_id: channel?.channel_id || null, detail: 'simulator_batch_touch' }) });
+    await recordEvent('marketing', 'CampaignInteractionRecorded', 'campaign_interaction', interaction.interaction_id, { customer_id: customer.customer_id, campaign_id: campaign.campaign_id, event_type: eventType });
+    if (Math.random() < 0.4) { const feedback = await api('feedback', '/api/feedback', { method: 'POST', body: JSON.stringify({ customer_id: customer.customer_id, campaign_id: campaign.campaign_id, source: 'survey', rating: 1 + Math.floor(Math.random() * 5), sentiment: sentiments[Math.floor(Math.random() * sentiments.length)], comment: `Batch ${eventType} response for ${campaign.name}` }) }); await recordEvent('feedback', 'FeedbackSubmitted', 'feedback', feedback.feedback_id, { customer_id: feedback.customer_id, campaign_id: feedback.campaign_id, rating: feedback.rating, sentiment: feedback.sentiment }); }
     document.querySelector('#marketing-flow-feedback').textContent = `Simulated ${index + 1} of ${size} engagement records.`;
   }
   await loadEngagementData();
@@ -602,7 +641,7 @@ storeSelect.addEventListener('change', () => loadStoreCatalog().catch((error) =>
 document.querySelector('#start-journey').addEventListener('click', () => startVisit().catch((error) => { feedbackElement.textContent = error.message; }));
 document.querySelectorAll('[data-outcome]').forEach((button) => button.addEventListener('click', () => completeOutcome(button.dataset.outcome).catch((error) => { feedbackElement.textContent = error.message; })));
 document.querySelector('#simulate-batch').addEventListener('click', () => simulateBatch().catch((error) => { feedbackElement.textContent = error.message; }));
-document.querySelectorAll('[data-tab]').forEach((button) => button.addEventListener('click', () => { document.querySelector('#record-detail-panel').hidden = true; document.querySelectorAll('[data-tab]').forEach((tab) => tab.classList.toggle('active', tab === button)); document.querySelectorAll('.view').forEach((view) => { view.hidden = view.id !== `${button.dataset.tab}-view`; }); activateLeftSidebar(button.dataset.tab); if (button.dataset.tab === 'customers') loadCustomers().catch(() => {}); if (button.dataset.tab === 'orders') loadCartOrderData().catch((error) => { document.querySelector('#orders-feedback').textContent = error.message; }); if (button.dataset.tab === 'catalog') loadCatalogDirectory().catch((error) => { document.querySelector('#catalog-directory-feedback').textContent = error.message; }); if (button.dataset.tab === 'engagement') loadEngagementData().catch((error) => { document.querySelector('#engagement-feedback').textContent = error.message; }); }));
+document.querySelectorAll('[data-tab]').forEach((button) => button.addEventListener('click', () => { document.querySelector('#record-detail-panel').hidden = true; document.querySelectorAll('[data-tab]').forEach((tab) => tab.classList.toggle('active', tab === button)); document.querySelectorAll('.view').forEach((view) => { view.hidden = view.id !== `${button.dataset.tab}-view`; }); activateLeftSidebar(button.dataset.tab); if (button.dataset.tab === 'customers') loadCustomers().catch(() => {}); if (button.dataset.tab === 'orders') loadCartOrderData().catch((error) => { document.querySelector('#orders-feedback').textContent = error.message; }); if (button.dataset.tab === 'catalog') loadCatalogDirectory().catch((error) => { document.querySelector('#catalog-directory-feedback').textContent = error.message; }); if (button.dataset.tab === 'sites') loadSiteData().catch((error) => { document.querySelector('#sites-feedback').textContent = error.message; }); if (button.dataset.tab === 'engagement') loadEngagementData().catch((error) => { document.querySelector('#engagement-feedback').textContent = error.message; }); if (button.dataset.tab === 'events') loadEventData().catch((error) => { document.querySelector('#events-feedback').textContent = error.message; }); }));
 document.querySelector('#load-default-csv').addEventListener('click', () => loadBundledCsv().catch((error) => { document.querySelector('#customer-feedback').textContent = error.message; }));
 document.querySelector('#customer-file').addEventListener('change', (event) => { if (event.target.files[0]) event.target.files[0].text().then((text) => showCustomerPreview(parseCsv(text))); });
 document.querySelector('#import-customers').addEventListener('click', () => importCustomers().catch((error) => { document.querySelector('#customer-feedback').textContent = error.message; }));
@@ -619,6 +658,8 @@ document.querySelector('#simulate-engagement-batch').addEventListener('click', (
 document.querySelector('#refresh-engagement').addEventListener('click', () => loadEngagementData().catch((error) => { document.querySelector('#engagement-feedback').textContent = error.message; }));
 document.querySelector('#refresh-sites').addEventListener('click', () => loadSiteData().catch((error) => { document.querySelector('#sites-feedback').textContent = error.message; }));
 document.querySelector('#sites-customer-filter').addEventListener('change', () => loadSiteData().catch((error) => { document.querySelector('#sites-feedback').textContent = error.message; }));
+document.querySelector('#refresh-events').addEventListener('click', () => loadEventData().catch((error) => { document.querySelector('#events-feedback').textContent = error.message; }));
+document.querySelector('#events-correlation-filter').addEventListener('change', () => loadEventData().catch((error) => { document.querySelector('#events-feedback').textContent = error.message; }));
 document.querySelector('#refresh-customers').addEventListener('click', () => loadCustomers().catch(() => {}));
 document.querySelector('#refresh-orders').addEventListener('click', () => loadCartOrderData().catch((error) => { document.querySelector('#orders-feedback').textContent = error.message; }));
 document.querySelector('#orders-customer-filter').addEventListener('change', () => { syncCurrentCustomer(document.querySelector('#orders-customer-filter').value); loadCartOrderData().catch((error) => { document.querySelector('#orders-feedback').textContent = error.message; }); });

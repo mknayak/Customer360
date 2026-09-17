@@ -20,6 +20,8 @@ services=(
   "site|site_service.app:app|8004|site_service/app.py"
   "feedback|feedback_service.app:app|8005|feedback_service/app.py"
   "marketing|marketing_service.app:app|8006|marketing_service/app.py"
+  "events|event_service.app:app|8007|event_service/app.py"
+  "orchestration|orchestration_service.app:app|8008|orchestration_service/app.py"
 )
 
 free_port() {

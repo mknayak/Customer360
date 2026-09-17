@@ -9,7 +9,7 @@
 <body>
   <main class="shell">
     <header class="topbar"><div class="brand"><span class="brand-mark">N</span><span>Northstar</span></div><span class="environment"><span class="pulse"></span>Local simulation</span></header>
-    <nav class="tabs" aria-label="Simulator views"><button class="tab active" data-tab="journey">Shopping journey</button><button class="tab" data-tab="orders">Carts / orders</button><button class="tab" data-tab="customers">Customers</button><button class="tab" data-tab="catalog">Product / store data</button><button class="tab" data-tab="sites">Sites</button><button class="tab" data-tab="engagement">Marketing / feedback</button></nav>
+    <nav class="tabs" aria-label="Simulator views"><button class="tab active" data-tab="journey">Shopping journey</button><button class="tab" data-tab="orders">Carts / orders</button><button class="tab" data-tab="customers">Customers</button><button class="tab" data-tab="catalog">Product / store data</button><button class="tab" data-tab="sites">Sites</button><button class="tab" data-tab="engagement">Marketing / feedback</button><button class="tab" data-tab="events">Events</button></nav>
     <aside id="left-sidebar" class="left-panel"><div class="side-header"><p class="eyebrow" id="left-sidebar-kicker">Simulator</p><h3 id="left-sidebar-title">Actions</h3></div><div id="left-sidebar-body" class="side-body"></div></aside>
     <aside id="record-detail-panel" class="detail-panel" hidden><div class="detail-header"><div><p class="eyebrow" id="record-detail-type">Record details</p><h3 id="record-detail-title">Select a row</h3></div><button id="close-record-detail" class="page-button">Close</button></div><div id="record-detail-body" class="detail-body"><p class="table-message">Click a table row to inspect details.</p></div></aside>
     <section id="journey-view" class="view active-view">
@@ -76,6 +76,12 @@
       <div class="table-wrap"><table><thead><tr><th>Campaign</th><th>Status</th><th>Objective</th><th>Budget</th><th>Starts</th></tr></thead><tbody id="campaign-table-body"><tr><td colspan="5" class="table-message">Click Refresh to load campaigns.</td></tr></tbody></table></div>
       <div class="table-wrap stacked-table"><table><thead><tr><th>Customer</th><th>Campaign</th><th>Source</th><th>Rating</th><th>Sentiment</th><th>Status</th></tr></thead><tbody id="feedback-table-body"><tr><td colspan="6" class="table-message">Click Refresh to load feedback.</td></tr></tbody></table></div>
       <p id="engagement-feedback" class="feedback" role="status">Marketing and Feedback services must be running on ports 8006 and 8005.</p>
+    </section>
+    <section id="events-view" class="view customer-view" hidden>
+      <div class="customer-heading"><div><p class="eyebrow">Event backbone / Correlation</p><h2>Captured enterprise events</h2><p class="lede">Inspect immutable events emitted by simulator workflows and service actions. Filter by workflow correlation ID to follow a customer journey.</p></div><span id="events-state" class="state">Not loaded</span></div>
+      <div class="directory-toolbar"><div><p class="eyebrow">Events / Filters</p><h3>Find event activity</h3></div><div class="directory-controls"><label class="search-field"><span>Correlation ID</span><input id="events-correlation-filter" type="search" placeholder="Optional workflow ID"></label><button id="refresh-events" class="refresh-button">Refresh</button></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Recorded</th><th>Event</th><th>Source</th><th>Aggregate</th><th>Correlation</th><th>Payload</th></tr></thead><tbody id="events-table-body"><tr><td colspan="6" class="table-message">Click Refresh to load events.</td></tr></tbody></table></div>
+      <p id="events-feedback" class="feedback" role="status">Event service must be running on port 8007.</p>
     </section>
     <footer><span>Customer360 / Enterprise Simulator</span><span id="api-status">Checking CRM...</span></footer>
   </main>
