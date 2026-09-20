@@ -490,6 +490,8 @@ Turn multiple tool calls and domain investigations into a controlled executive d
 
 ## Phase 10: Executive experience
 
+**Status: Complete (dependency-free runtime slice)**
+
 ### Goal
 Wrap the agentic layer in a usable, decision-oriented experience for executives.
 
@@ -504,11 +506,11 @@ Wrap the agentic layer in a usable, decision-oriented experience for executives.
 - recommended next action cards
 
 ### Work items
-- Add executive UI shell or route layer
-- Integrate with DecisionOS responses
-- Add source and evidence views
-- Add chart-ready outputs for top metrics
-- Add follow-up recommendation prompts
+- [x] Add executive UI shell or route layer
+- [x] Integrate with DecisionOS responses
+- [x] Add source and evidence views
+- [x] Add chart-ready outputs for top metrics
+- [x] Add follow-up recommendation prompts
 
 ### Acceptance criteria
 - The user can ask a business question and receive a structured brief.

@@ -39,6 +39,23 @@ def test_chat_endpoint_runs_investigation_from_prompt():
     assert body["investigation_id"]
 
 
+def test_executive_brief_exposes_traceable_decision_sections():
+    client = TestClient(app)
+    response = client.post(
+        "/api/executive/brief",
+        json={"prompt": "Which KPI needs attention?", "principal_id": "cfo-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["question"] == "Which KPI needs attention?"
+    assert body["facts"]
+    assert body["metrics"][0]["label"] == "Revenue"
+    assert body["evidence"][0]["source"] == "analytics.query"
+    assert body["follow_up_questions"]
+    assert body["conversation_id"]
+
+
 def test_create_and_run_investigation():
     client = TestClient(app)
     response = client.post(
