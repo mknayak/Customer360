@@ -32,12 +32,19 @@ class EventRepository:
                     recorded_at TEXT NOT NULL,
                     correlation_id TEXT,
                     causation_id TEXT,
+                    idempotency_key TEXT,
                     schema_version INTEGER NOT NULL
                 )
                 """
             )
+            columns = {row["name"] for row in self.connection.execute("PRAGMA table_info(events)")}
+            if "idempotency_key" not in columns:
+                self.connection.execute("ALTER TABLE events ADD COLUMN idempotency_key TEXT")
             self.connection.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type)")
             self.connection.execute("CREATE INDEX IF NOT EXISTS idx_events_correlation ON events(correlation_id)")
+            self.connection.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_idempotency ON events(idempotency_key) WHERE idempotency_key IS NOT NULL"
+            )
 
     @staticmethod
     def event(row: sqlite3.Row) -> Event:
@@ -52,17 +59,25 @@ class EventRepository:
             recorded_at=datetime.fromisoformat(row["recorded_at"]),
             correlation_id=row["correlation_id"],
             causation_id=row["causation_id"],
+            idempotency_key=row["idempotency_key"],
             schema_version=row["schema_version"],
         )
 
     def append(self, item: Event) -> Event:
         with self.lock, self.connection:
+            if item.idempotency_key:
+                existing = self.connection.execute(
+                    "SELECT * FROM events WHERE idempotency_key = ?",
+                    (item.idempotency_key,),
+                ).fetchone()
+                if existing is not None:
+                    return self.event(existing)
             self.connection.execute(
                 """
                 INSERT INTO events (
                     event_id, source_service, event_type, aggregate_type, aggregate_id,
-                    payload, occurred_at, recorded_at, correlation_id, causation_id, schema_version
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    payload, occurred_at, recorded_at, correlation_id, causation_id, idempotency_key, schema_version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     item.event_id,
@@ -75,6 +90,7 @@ class EventRepository:
                     item.recorded_at.isoformat(),
                     item.correlation_id,
                     item.causation_id,
+                    item.idempotency_key,
                     item.schema_version,
                 ),
             )
@@ -85,6 +101,7 @@ class EventRepository:
         event_type: str | None = None,
         source_service: str | None = None,
         correlation_id: str | None = None,
+        recorded_after: datetime | None = None,
         limit: int = 100,
     ) -> list[Event]:
         clauses: list[str] = []
@@ -98,6 +115,9 @@ class EventRepository:
         if correlation_id:
             clauses.append("correlation_id = ?")
             params.append(correlation_id)
+        if recorded_after:
+            clauses.append("recorded_at > ?")
+            params.append(recorded_after.isoformat())
         query = "SELECT * FROM events"
         if clauses:
             query += " WHERE " + " AND ".join(clauses)

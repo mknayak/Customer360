@@ -232,3 +232,12 @@ def test_semantic_lookup_execution_returns_provenance_and_evidence_reference():
     assert result.source == ("customer360.semantic.metric_registry",)
     assert result.definition == ("v1",)
     assert result.evidence_references == ("metric-definition:customer360.conversion",)
+
+
+def test_semantic_lookup_execution_surfaces_stale_definition():
+    result = SemanticRegistry().lookup_execution(
+        {"term": "revenue", "as_of": "2026-09-22T00:00:00Z"}
+    )
+
+    assert result.data["status"] == "stale"
+    assert result.warnings

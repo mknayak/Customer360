@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, status
 
 from .client import ServiceCallError, ServiceClient
 from .models import ShoppingJourneyCreate, WorkflowResult
+from .repository import WorkflowRepository
 
 SERVICE_ORIGINS = {
     "site": os.getenv("SITE_ORIGIN", "http://127.0.0.1:8004"),
@@ -14,11 +15,21 @@ SERVICE_ORIGINS = {
 
 app = FastAPI(title="Customer360 Orchestration Service", version="0.1.0")
 client = ServiceClient(SERVICE_ORIGINS)
+repository = WorkflowRepository()
 
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
+    repository.get("health-check")
     return {"status": "ok", "service": "orchestration"}
+
+
+@app.get("/api/workflows/{workflow_id}", response_model=WorkflowResult)
+def get_workflow(workflow_id: str) -> WorkflowResult:
+    workflow = repository.get(workflow_id)
+    if workflow is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return workflow
 
 
 def publish_event(
@@ -50,6 +61,8 @@ def start_shopping_journey(payload: ShoppingJourneyCreate) -> WorkflowResult:
     published_event_ids: list[str] = []
     visit_id = None
     cart_id = None
+    running = WorkflowResult(workflow_id=workflow_id, correlation_id=correlation_id, status="running")
+    repository.save(running)
     try:
         visit = client.post(
             "site",
@@ -93,7 +106,7 @@ def start_shopping_journey(payload: ShoppingJourneyCreate) -> WorkflowResult:
                 correlation_id,
             )
         )
-        return WorkflowResult(
+        result = WorkflowResult(
             workflow_id=workflow_id,
             correlation_id=correlation_id,
             status="completed",
@@ -101,7 +114,19 @@ def start_shopping_journey(payload: ShoppingJourneyCreate) -> WorkflowResult:
             cart_id=cart_id,
             published_event_ids=published_event_ids,
         )
+        repository.save(result)
+        return result
     except (KeyError, ServiceCallError) as error:
+        failed = WorkflowResult(
+            workflow_id=workflow_id,
+            correlation_id=correlation_id,
+            status="failed",
+            visit_id=visit_id,
+            cart_id=cart_id,
+            published_event_ids=published_event_ids,
+            failure=str(error),
+        )
+        repository.save(failed)
         raise HTTPException(
             status_code=502,
             detail={

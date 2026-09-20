@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, status
 
 from .models import Audience, AudienceCreate, Campaign, CampaignAudience, CampaignAudienceCreate, CampaignChannel, CampaignChannelCreate, CampaignCreate, CampaignInteraction, CampaignInteractionCreate, CampaignUpdate, Channel, ChannelCreate
+from .events import publish_event
 from .repository import MarketingRepository
 
 
@@ -46,7 +47,9 @@ def health() -> dict[str, str]:
 def create_campaign(payload: CampaignCreate) -> Campaign:
     item = Campaign(**payload.model_dump())
     validate_campaign_dates(item)
-    return repository.save_campaign(item)
+    item = repository.save_campaign(item)
+    publish_event("CampaignCreated", "campaign", item.campaign_id, item.model_dump(mode="json"), occurred_at=item.created_at)
+    return item
 
 
 @app.get("/api/campaigns", response_model=list[Campaign])
@@ -65,18 +68,24 @@ def update_campaign(campaign_id: str, payload: CampaignUpdate) -> Campaign:
     changes = payload.model_dump(exclude_unset=True)
     updated = item.model_copy(update={**changes, "updated_at": datetime.now(timezone.utc)})
     validate_campaign_dates(updated)
-    return repository.save_campaign(updated)
+    updated = repository.save_campaign(updated)
+    event_type = {"active": "CampaignStarted", "ended": "CampaignEnded"}.get(updated.status, "CampaignUpdated")
+    publish_event(event_type, "campaign", updated.campaign_id, updated.model_dump(mode="json"), occurred_at=updated.updated_at)
+    return updated
 
 
 @app.delete("/api/campaigns/{campaign_id}", status_code=204)
 def delete_campaign(campaign_id: str) -> None:
-    get_campaign_or_404(campaign_id)
+    item = get_campaign_or_404(campaign_id)
     repository.delete_campaign(campaign_id)
+    publish_event("CampaignDeleted", "campaign", item.campaign_id, {"campaign_id": item.campaign_id}, occurred_at=datetime.now(timezone.utc))
 
 
 @app.post("/api/audiences", response_model=Audience, status_code=201)
 def create_audience(payload: AudienceCreate) -> Audience:
-    return repository.save_audience(Audience(**payload.model_dump()))
+    item = repository.save_audience(Audience(**payload.model_dump()))
+    publish_event("AudienceCreated", "audience", item.audience_id, item.model_dump(mode="json"), occurred_at=item.created_at)
+    return item
 
 
 @app.get("/api/audiences", response_model=list[Audience])
@@ -91,7 +100,9 @@ def get_audience(audience_id: str) -> Audience:
 
 @app.post("/api/channels", response_model=Channel, status_code=201)
 def create_channel(payload: ChannelCreate) -> Channel:
-    return repository.save_channel(Channel(**payload.model_dump()))
+    item = repository.save_channel(Channel(**payload.model_dump()))
+    publish_event("ChannelCreated", "channel", item.channel_id, item.model_dump(mode="json"), occurred_at=item.created_at)
+    return item
 
 
 @app.get("/api/channels", response_model=list[Channel])
@@ -108,7 +119,9 @@ def get_channel(channel_id: str) -> Channel:
 def add_campaign_audience(campaign_id: str, payload: CampaignAudienceCreate) -> CampaignAudience:
     get_campaign_or_404(campaign_id)
     get_audience_or_404(payload.audience_id)
-    return repository.save_campaign_audience(CampaignAudience(campaign_id=campaign_id, **payload.model_dump()))
+    item = repository.save_campaign_audience(CampaignAudience(campaign_id=campaign_id, **payload.model_dump()))
+    publish_event("CampaignAudienceAssigned", "campaign", campaign_id, item.model_dump(mode="json"), occurred_at=item.created_at)
+    return item
 
 
 @app.get("/api/campaigns/{campaign_id}/audiences", response_model=list[Audience])
@@ -121,7 +134,9 @@ def list_campaign_audiences(campaign_id: str) -> list[Audience]:
 def add_campaign_channel(campaign_id: str, payload: CampaignChannelCreate) -> CampaignChannel:
     get_campaign_or_404(campaign_id)
     get_channel_or_404(payload.channel_id)
-    return repository.save_campaign_channel(CampaignChannel(campaign_id=campaign_id, **payload.model_dump()))
+    item = repository.save_campaign_channel(CampaignChannel(campaign_id=campaign_id, **payload.model_dump()))
+    publish_event("CampaignChannelAssigned", "campaign", campaign_id, item.model_dump(mode="json"), occurred_at=item.created_at)
+    return item
 
 
 @app.get("/api/campaigns/{campaign_id}/channels", response_model=list[CampaignChannel])
@@ -135,7 +150,9 @@ def add_campaign_interaction(campaign_id: str, payload: CampaignInteractionCreat
     get_campaign_or_404(campaign_id)
     if payload.channel_id is not None:
         get_channel_or_404(payload.channel_id)
-    return repository.add_campaign_interaction(CampaignInteraction(campaign_id=campaign_id, **payload.model_dump()))
+    item = repository.add_campaign_interaction(CampaignInteraction(campaign_id=campaign_id, **payload.model_dump()))
+    publish_event("CampaignInteractionRecorded", "campaign", campaign_id, item.model_dump(mode="json"), occurred_at=item.occurred_at)
+    return item
 
 
 @app.get("/api/campaigns/{campaign_id}/interactions", response_model=list[CampaignInteraction])

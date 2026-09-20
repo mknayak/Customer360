@@ -5,6 +5,7 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON="${PYTHON:-$ROOT_DIR/.venv/bin/python}"
 SERVICE_HOST="${SERVICE_HOST:-127.0.0.1}"
+export EVENT_SERVICE_URL="${EVENT_SERVICE_URL:-http://$SERVICE_HOST:8007}"
 
 if [[ ! -x "$PYTHON" ]]; then
   echo "Shared Python environment not found: $PYTHON" >&2
@@ -25,6 +26,7 @@ services=(
 )
 
 agent_app_port="8009"
+data_platform_port="8010"
 
 free_port() {
   local port="$1"
@@ -107,12 +109,24 @@ start_agent_app() {
   service_pids+=("$!")
 }
 
+start_data_platform() {
+  local data_platform_dir="$ROOT_DIR/Enterprise/DataPlatform"
+  free_port "$data_platform_port"
+  echo "Starting data platform on http://$SERVICE_HOST:$data_platform_port"
+  PYTHONUNBUFFERED=1 "$PYTHON" -m uvicorn data_platform.app:app \
+    --app-dir "$data_platform_dir" \
+    --host "$SERVICE_HOST" \
+    --port "$data_platform_port" &
+  service_pids+=("$!")
+}
+
 for service in "${services[@]}"; do
   IFS="|" read -r name module port module_file <<< "$service"
   start_service "$name" "$module" "$port" "$module_file"
 done
 start_simulator
 start_agent_app
+start_data_platform
 
 if [[ ${#service_pids[@]} -eq 0 ]]; then
   echo "No implemented services were found." >&2

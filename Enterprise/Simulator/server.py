@@ -14,6 +14,7 @@ FEEDBACK_ORIGIN = "http://127.0.0.1:8005"
 MARKETING_ORIGIN = "http://127.0.0.1:8006"
 EVENTS_ORIGIN = "http://127.0.0.1:8007"
 ORCHESTRATION_ORIGIN = "http://127.0.0.1:8008"
+DATA_PLATFORM_ORIGIN = "http://127.0.0.1:8010"
 
 
 PROXY_ORIGINS = {
@@ -25,6 +26,7 @@ PROXY_ORIGINS = {
     "marketing": MARKETING_ORIGIN,
     "events": EVENTS_ORIGIN,
     "orchestration": ORCHESTRATION_ORIGIN,
+    "data-platform": DATA_PLATFORM_ORIGIN,
 }
 
 

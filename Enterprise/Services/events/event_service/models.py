@@ -18,6 +18,7 @@ class EventCreate(BaseModel):
     occurred_at: datetime = Field(default_factory=utc_now)
     correlation_id: str | None = None
     causation_id: str | None = None
+    idempotency_key: str | None = Field(default=None, min_length=1)
     schema_version: int = Field(default=1, ge=1)
 
 

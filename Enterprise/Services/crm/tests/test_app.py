@@ -7,6 +7,14 @@ from crm_service.repository import CrmRepository
 def test_customer_api_contract(monkeypatch, tmp_path):
     repository = CrmRepository(tmp_path / "crm.sqlite3")
     monkeypatch.setattr(app_module, "repository", repository)
+    published = []
+    monkeypatch.setattr(
+        app_module,
+        "publish_event",
+        lambda event_type, aggregate_id, payload, *, occurred_at: published.append(
+            (event_type, aggregate_id, payload, occurred_at)
+        ),
+    )
     client = TestClient(app_module.app)
 
     assert client.get("/api/health").json() == {"status": "ok", "service": "crm"}
@@ -17,6 +25,7 @@ def test_customer_api_contract(monkeypatch, tmp_path):
     )
     assert created.status_code == 201
     customer_id = created.json()["customer_id"]
+    assert published[0][0:2] == ("CustomerCreated", customer_id)
 
     profile = client.post(
         f"/api/customers/{customer_id}/profile",
@@ -31,6 +40,14 @@ def test_customer_api_contract(monkeypatch, tmp_path):
     )
     assert segment.status_code == 200
     assert segment.json()["customer_id"] == customer_id
+
+    updated = client.put(f"/api/customers/{customer_id}", json={"status": "inactive"})
+    assert updated.status_code == 200
+    assert published[-1][0:2] == ("CustomerUpdated", customer_id)
+
+    deleted = client.delete(f"/api/customers/{customer_id}")
+    assert deleted.status_code == 204
+    assert published[-1][0:2] == ("CustomerDeleted", customer_id)
 
     missing = client.get("/api/customers/missing")
     assert missing.status_code == 404

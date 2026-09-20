@@ -4,7 +4,9 @@ Owns customer identity, profiles, and customer segments.
 
 The service stores its data in the service-owned SQLite database at
 `data/crm.sqlite3`. The schema is managed by the SQL migrations in
-`migrations/` and applied automatically on startup.
+`migrations/` and applied automatically on startup. Customer create, update,
+and delete operations publish immutable events to the Event service at
+`EVENT_SERVICE_URL` (default `http://127.0.0.1:8007`).
 
 ## Run locally
 
@@ -37,5 +39,5 @@ The repository-root `.venv` is shared by all enterprise services.
 - `POST /api/customers/{customer_id}/segments`
 - `GET /api/customers/{customer_id}/segments`
 
-Domain events are represented by the service boundary now and will be wired to
-the event backbone after the CRUD services are established.
+CRM customer lifecycle events use the shared event envelope with
+`source_service=crm`, `aggregate_type=customer`, and schema version `1`.

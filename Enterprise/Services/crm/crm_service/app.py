@@ -17,6 +17,7 @@ from .models import (
     CustomerPage,
     CustomerUpdate,
 )
+from .events import publish_event
 from .repository import CrmRepository
 
 app = FastAPI(title="Customer360 CRM Service", version="0.1.0")
@@ -65,7 +66,14 @@ def require_customer(customer_id: str) -> Customer:
 
 @app.post("/api/customers", response_model=Customer, status_code=status.HTTP_201_CREATED)
 def create_customer(payload: CustomerCreate) -> Customer:
-    return repository.save_customer(Customer(**payload.model_dump()))
+    customer = repository.save_customer(Customer(**payload.model_dump()))
+    publish_event(
+        "CustomerCreated",
+        customer.customer_id,
+        customer.model_dump(mode="json"),
+        occurred_at=customer.created_at,
+    )
+    return customer
 
 
 @app.get("/api/customers", response_model=CustomerPage)
@@ -108,13 +116,26 @@ def update_customer(customer_id: str, payload: CustomerUpdate) -> Customer:
     customer = require_customer(customer_id)
     changes = payload.model_dump(exclude_unset=True)
     updated = customer.model_copy(update={**changes, "updated_at": datetime.now(timezone.utc)})
-    return repository.save_customer(updated)
+    updated = repository.save_customer(updated)
+    publish_event(
+        "CustomerUpdated",
+        updated.customer_id,
+        updated.model_dump(mode="json"),
+        occurred_at=updated.updated_at,
+    )
+    return updated
 
 
 @app.delete("/api/customers/{customer_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_customer(customer_id: str) -> None:
-    require_customer(customer_id)
+    customer = require_customer(customer_id)
     repository.delete_customer(customer_id)
+    publish_event(
+        "CustomerDeleted",
+        customer.customer_id,
+        {"customer_id": customer.customer_id},
+        occurred_at=datetime.now(timezone.utc),
+    )
 
 
 @app.post("/api/customers/{customer_id}/profile", response_model=CustomerProfile)

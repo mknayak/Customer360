@@ -38,4 +38,8 @@ def test_shopping_journey_coordinates_services_and_events(monkeypatch):
     assert response.status_code == 201
     assert response.json()["status"] == "completed"
     assert response.json()["published_event_ids"] == ["event-1", "event-2"]
+    workflow_id = response.json()["workflow_id"]
+    status_response = client.get(f"/api/workflows/{workflow_id}")
+    assert status_response.status_code == 200
+    assert status_response.json()["status"] == "completed"
     assert [call[0] for call in fake_client.calls] == ["site", "events", "shopping", "shopping", "events"]

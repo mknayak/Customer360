@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Query, status
 
 from .models import Site, SiteCreate, SiteUpdate, Visit, VisitCreate
+from .events import publish_event
 from .repository import SiteRepository
 
 app = FastAPI(title="Customer360 Site Service", version="0.1.0")
@@ -28,7 +29,9 @@ def health() -> dict[str, str]:
 
 @app.post("/api/sites", response_model=Site, status_code=status.HTTP_201_CREATED)
 def create_site(payload: SiteCreate) -> Site:
-    return repository.save_site(Site(**payload.model_dump()))
+    item = repository.save_site(Site(**payload.model_dump()))
+    publish_event("SiteCreated", "site", item.site_id, item.model_dump(mode="json"), occurred_at=item.created_at)
+    return item
 
 
 @app.get("/api/sites", response_model=list[Site])
@@ -46,13 +49,16 @@ def update_site(site_id: str, payload: SiteUpdate) -> Site:
     item = get_site_or_404(site_id)
     changes = payload.model_dump(exclude_unset=True)
     updated = item.model_copy(update={**changes, "updated_at": utc_now()})
-    return repository.save_site(updated)
+    updated = repository.save_site(updated)
+    publish_event("SiteUpdated", "site", updated.site_id, updated.model_dump(mode="json"), occurred_at=updated.updated_at)
+    return updated
 
 
 @app.delete("/api/sites/{site_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_site(site_id: str) -> None:
-    get_site_or_404(site_id)
+    item = get_site_or_404(site_id)
     repository.delete_site(site_id)
+    publish_event("SiteDeleted", "site", item.site_id, {"site_id": item.site_id}, occurred_at=utc_now())
 
 
 @app.post("/api/visits", response_model=Visit, status_code=status.HTTP_201_CREATED)
@@ -63,7 +69,9 @@ def create_visit(payload: VisitCreate) -> Visit:
     item = Visit(**visit_data)
     if item.ended_at and item.ended_at < item.started_at:
         raise HTTPException(status_code=400, detail="ended_at cannot be earlier than started_at")
-    return repository.save_visit(item)
+    item = repository.save_visit(item)
+    publish_event("VisitEnded" if item.ended_at else "VisitStarted", "visit", item.visit_id, item.model_dump(mode="json"), occurred_at=item.ended_at or item.started_at)
+    return item
 
 
 @app.get("/api/visits", response_model=list[Visit])

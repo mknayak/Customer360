@@ -91,7 +91,12 @@ class SemanticRegistry:
             term = term[0]
         if not isinstance(term, str):
             raise ValueError("Semantic lookup requires a string term")
-        result = self.lookup(term, context=inputs.get("context"))
+        as_of = inputs.get("as_of")
+        if isinstance(as_of, str):
+            as_of = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
+        if as_of is not None and not isinstance(as_of, datetime):
+            raise ValueError("Semantic lookup as_of must be an ISO datetime")
+        result = self.lookup(term, context=inputs.get("context"), as_of=as_of)
         data = {
             "status": result.status,
             "term": result.term,

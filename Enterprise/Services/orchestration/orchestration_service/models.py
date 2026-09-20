@@ -22,7 +22,7 @@ class ShoppingJourneyCreate(BaseModel):
 class WorkflowResult(BaseModel):
     workflow_id: str = Field(default_factory=lambda: str(uuid4()))
     workflow_type: str = "shopping_journey"
-    status: Literal["completed", "failed"]
+    status: Literal["running", "completed", "failed"]
     correlation_id: str
     visit_id: str | None = None
     cart_id: str | None = None

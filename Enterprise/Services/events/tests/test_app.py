@@ -17,6 +17,7 @@ def test_event_can_be_appended_and_filtered(tmp_path):
             "aggregate_id": "order-1",
             "payload": {"total": 25.0},
             "correlation_id": "workflow-1",
+            "idempotency_key": "shopping:OrderCreated:order-1",
         },
     )
 
@@ -25,3 +26,22 @@ def test_event_can_be_appended_and_filtered(tmp_path):
     events = client.get("/api/events?correlation_id=workflow-1").json()
     assert len(events) == 1
     assert events[0]["payload"] == {"total": 25.0}
+
+    duplicate = client.post(
+        "/api/events",
+        json={
+            "source_service": "shopping",
+            "event_type": "OrderCreated",
+            "aggregate_type": "order",
+            "aggregate_id": "order-1",
+            "payload": {"total": 99.0},
+            "idempotency_key": "shopping:OrderCreated:order-1",
+        },
+    )
+    assert duplicate.status_code == 201
+    assert duplicate.json()["event_id"] == response.json()["event_id"]
+    assert duplicate.json()["payload"] == {"total": 25.0}
+
+    replay = client.get("/api/events/replay?source_service=shopping&limit=10")
+    assert replay.status_code == 200
+    assert len(replay.json()) == 1

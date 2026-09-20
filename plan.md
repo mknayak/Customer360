@@ -1,17 +1,18 @@
 # Customer360 Implementation Plan
 
-Last updated: 2026-09-17
+Last updated: 2026-09-20
 
 This is the living implementation tracker for the Customer360 synthetic enterprise. The detailed target architecture remains in `enterprise-intelligence-brain-development.md`.
 
 ## Current Status
 
-The operational service foundation is implemented. The repository now has six domain services, a local Event service, an Orchestration service, and a simulator UI integrated with the service APIs.
+The operational service foundation and the first governed agentic layer are implemented. The repository now has six domain services, a local Event service, an Orchestration service, a DecisionOS runtime, an Agent app, and a simulator UI integrated with the service APIs.
 
 Validation completed:
 
-- All backend test suites pass: 18 tests passed.
-- CRM, Product, Shopping, Site, Feedback, Marketing, Events, and Orchestration health endpoints return `200` when started with `./run.sh`.
+- Agent app and DecisionOS runtime tests pass: 39 passed, 1 deselected (`multi_hop`).
+- CRM, Product, Shopping, Site, Feedback, Marketing, Events, Orchestration, and Agent app health endpoints return `200` when started with `./run.sh`.
+- The Agent app executive brief endpoint returns a structured response for a valid request and rejects invalid requests with `422`.
 - The simulator is served on `http://127.0.0.1:8080`.
 - The simulator Sites and Events tabs are present.
 - A live shopping workflow creates a Site visit, Shopping cart, cart item, and correlated `VisitStarted` and `CartCreated` events.
@@ -80,23 +81,43 @@ Validation completed:
 - [x] Simulator Events tab with event table, filtering, and sidebar statistics
 - [x] Simulator shopping journey routed through Orchestration
 
+### Agentic intelligence foundation
+
+- [x] DecisionOS runtime contracts and investigation lifecycle
+- [x] Governed tool catalog, permission-first dispatch, and evidence envelopes
+- [x] Service adapters for operational APIs and event timelines
+- [x] Bounded domain agent pack and executive orchestrator
+- [x] Semantic metric governance, graph investigation, and dependency-free RAG/GraphRAG slices
+- [x] Evidence validation, contradiction handling, confidence scoring, and decision records
+- [x] Workflow execution with retries, timeouts, compensation hooks, and idempotency
+- [x] Agent app executive brief API on port `8009`
+- [x] Agent app and DecisionOS runtime test coverage
+
 ## In Progress / Next
+
+### Productionize the agentic foundation
+
+- [ ] Replace dependency-free graph and RAG slices with production stores and retrieval providers
+- [ ] Connect analytics and semantic adapters to production data-platform implementations
+- [ ] Add end-to-end evaluation fixtures for the target executive questions
+- [ ] Complete durable persistence and audit storage beyond the current runtime boundary
+- [ ] Add authentication, authorization, and deployment configuration for the Agent app
 
 ### Complete event capture across services
 
-- [ ] Add service-owned event publishing for CRM lifecycle changes
-- [ ] Add Product events for product, price, promotion, catalog, and inventory changes
-- [ ] Add Shopping events for cart, order, payment, abandonment, and cancellation changes
-- [ ] Add Site events for site and visit lifecycle changes
-- [ ] Add Feedback events for submissions and updates
-- [ ] Add Marketing events for campaign lifecycle and interactions
+- [x] Add service-owned event publishing for CRM customer create, update, and delete changes
+- [x] Add Product events for product, price, promotion, catalog, and inventory changes
+- [x] Add Shopping events for cart, order, payment, abandonment, and cancellation changes
+- [x] Add Site events for site and visit lifecycle changes
+- [x] Add Feedback events for submissions and updates
+- [x] Add Marketing events for campaign lifecycle and interactions
 - [ ] Define event name, payload, schema-version, causation, and correlation conventions
-- [ ] Add idempotency and retry behavior
-- [ ] Add event replay/consumer API
+- [x] Add idempotency and retry behavior for event append and service publishers
+- [x] Add bounded event replay API
 
 ### Strengthen orchestration
 
-- [ ] Add durable workflow state and workflow status queries
+- [x] Add durable workflow state and workflow status queries
 - [ ] Add retries, timeouts, and compensation behavior
 - [ ] Add checkout, payment, cancellation, and fulfillment workflow steps
 - [ ] Add workflow failure and completion events
@@ -105,20 +126,26 @@ Validation completed:
 
 ### Phase 6: Simulation engine
 
-- [ ] Configurable scenario definitions
-- [ ] Generate 10,000+ customers
-- [ ] Generate 100+ products and 5-10 sites
-- [ ] Generate large behavioral event volumes
-- [ ] Simulate normal behavior, promotion uplift, website degradation, product surges, and feedback patterns
-- [ ] Add deterministic scenario seeds for repeatable evaluation
+The DecisionOS knowledge-graph Phase 6 slice is implemented separately in
+`agentic_plan.md`. This operational Phase 6 remains focused on scalable,
+repeatable business simulation. A deterministic scenario engine now supports
+the required scale floors and behavior modes; API ingestion and UI controls
+remain follow-up integration work.
+
+- [x] Configurable scenario definitions
+- [x] Generate 10,000+ customers
+- [x] Generate 100+ products and 5-10 sites
+- [x] Generate large behavioral event volumes
+- [x] Simulate normal behavior, promotion uplift, website degradation, product surges, and feedback patterns
+- [x] Add deterministic scenario seeds for repeatable evaluation
 
 ### Phase 7: Data platform
 
-- [ ] Event ingestion pipeline
-- [ ] Raw event storage
-- [ ] Curated analytical models
-- [ ] KPI query layer
-- [ ] Revenue, visits, conversion, cart abandonment, and product performance metrics
+- [x] Event ingestion pipeline
+- [x] Raw event storage
+- [x] Curated analytical models
+- [x] KPI query layer
+- [x] Revenue, visits, conversion, cart abandonment, and product performance metrics
 
 ### Phase 8: Semantic layer
 

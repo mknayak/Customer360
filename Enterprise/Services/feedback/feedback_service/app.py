@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, status
 
 from .models import Feedback, FeedbackCreate, FeedbackUpdate
+from .events import publish_event
 from .repository import FeedbackRepository
 
 
@@ -25,7 +26,9 @@ def health() -> dict[str, str]:
 
 @app.post("/api/feedback", response_model=Feedback, status_code=status.HTTP_201_CREATED)
 def create_feedback(payload: FeedbackCreate) -> Feedback:
-    return repository.save_feedback(Feedback(**payload.model_dump()))
+    item = repository.save_feedback(Feedback(**payload.model_dump()))
+    publish_event("FeedbackSubmitted", "feedback", item.feedback_id, item.model_dump(mode="json"), occurred_at=item.submitted_at)
+    return item
 
 
 @app.get("/api/feedback", response_model=list[Feedback])
@@ -47,10 +50,13 @@ def update_feedback(feedback_id: str, payload: FeedbackUpdate) -> Feedback:
     item = get_feedback_or_404(feedback_id)
     changes = payload.model_dump(exclude_unset=True)
     updated = item.model_copy(update={**changes, "updated_at": datetime.now(timezone.utc)})
-    return repository.save_feedback(updated)
+    updated = repository.save_feedback(updated)
+    publish_event("FeedbackUpdated", "feedback", updated.feedback_id, updated.model_dump(mode="json"), occurred_at=updated.updated_at)
+    return updated
 
 
 @app.delete("/api/feedback/{feedback_id}", status_code=204)
 def delete_feedback(feedback_id: str) -> None:
-    get_feedback_or_404(feedback_id)
+    item = get_feedback_or_404(feedback_id)
     repository.delete_feedback(feedback_id)
+    publish_event("FeedbackDeleted", "feedback", item.feedback_id, {"feedback_id": item.feedback_id}, occurred_at=datetime.now(timezone.utc))
