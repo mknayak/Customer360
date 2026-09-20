@@ -337,6 +337,8 @@ Define the business metrics and their meaning before analytical querying.
 
 ## Phase 6: Knowledge graph and entity relationships
 
+**Status: Complete (dependency-free runtime slice)**
+
 ### Goal
 Add a graph layer that helps answer relationship-driven questions and support multi-hop reasoning.
 
@@ -367,11 +369,11 @@ Add a graph layer that helps answer relationship-driven questions and support mu
 - order -> cart -> item -> product
 
 ### Work items
-- Define graph schema and node/edge conventions
-- Sync entities from service IDs and references
-- Add relationship refresh jobs
-- Implement graph queries for multi-hop exploration
-- Add lineage mapping from event to entity to report
+- [x] Define graph schema and node/edge conventions
+- [x] Sync entities from service IDs and references through `GraphStore.sync`
+- [x] Provide a deterministic refresh port for relationship synchronization
+- [x] Implement bounded graph search, neighbor, path, and relationship-summary queries
+- [x] Add lineage mapping from graph entities and edges to source references
 
 ### Acceptance criteria
 - It can answer questions like “which products are commonly bought by customers in segment X?”

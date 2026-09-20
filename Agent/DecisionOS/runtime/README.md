@@ -12,7 +12,20 @@ This directory contains the first executable DecisionOS slice. It is intentional
 - `decision_os.persistence`: replaceable persistence protocol and in-memory adapter
 - `decision_os.evaluation`: deterministic claim evaluation primitives
 - `decision_os.semantic`: versioned Customer360 metric definitions and governed lookup
+- `decision_os.graph`: allowlisted entity schema, refresh API, bounded relationship traversal, and graph tool handlers
 - `tests/`: focused runtime behavior tests
+
+Graphs can be rendered in Markdown-compatible viewers without an additional dependency:
+
+```python
+from decision_os.graph import GraphStore
+
+graph = GraphStore()
+graph.sync(entities, relationships)
+print(graph.to_mermaid())
+```
+
+The export is deterministic, bounded, and preserves relationship direction and labels.
 
 ## Run tests
 
@@ -22,4 +35,4 @@ From this directory:
 python -m pytest
 ```
 
-The runtime does not call LLMs or enterprise systems yet. Semantic lookups are resolved from the approved in-process metric registry; adapters can be added behind the typed ports once the service contracts are implemented.
+The runtime does not call LLMs or enterprise systems yet. Semantic lookups are resolved from the approved in-process metric registry, and graph records are refreshed through the typed `GraphStore.sync` port. Persistent graph and service-specific refresh jobs can be added behind these ports without changing governed tool callers.

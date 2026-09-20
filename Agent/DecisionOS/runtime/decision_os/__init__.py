@@ -3,6 +3,7 @@
 from .engine import InvestigationEngine
 from .agents import AgentFinding, AgentPack, AgentSpec, AgentTask
 from .semantic import MetricDefinition, SemanticLookup, SemanticRegistry
+from .graph import GraphEdge, GraphNode, GraphStore, graph_tool_handlers
 from .models import (
     DecisionBrief,
     Evidence,
@@ -24,6 +25,10 @@ __all__ = [
     "MetricDefinition",
     "SemanticLookup",
     "SemanticRegistry",
+    "GraphEdge",
+    "GraphNode",
+    "GraphStore",
+    "graph_tool_handlers",
     "Evidence",
     "Investigation",
     "InvestigationEngine",
