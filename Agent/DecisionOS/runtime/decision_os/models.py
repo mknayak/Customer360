@@ -43,8 +43,14 @@ class ToolResult:
     status: str
     data: Any = None
     source: tuple[str, ...] = ()
+    definition: tuple[str, ...] = ()
+    filters: Mapping[str, Any] = field(default_factory=dict)
+    freshness: Mapping[str, Any] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
     request_id: str = ""
+    generated_at: datetime = field(default_factory=utc_now)
+    query_metadata: Mapping[str, Any] = field(default_factory=dict)
+    evidence_references: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

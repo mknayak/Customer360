@@ -12,19 +12,25 @@ Tools are governed capabilities, not unrestricted access. Every tool must enforc
 
 ## Tools
 
-| Tool | Purpose | Read/Write |
-|---|---|---|
-| `permission.check` | Resolve user and data access | Read |
-| `semantic.lookup` | Resolve metric and business-term definitions | Read |
-| `graph.search` | Traverse approved entity relationships | Read |
-| `analytics.query` | Execute governed read-only analytical queries | Read |
-| `rag.search` | Retrieve relevant documents and passages | Read |
-| `lineage.explain` | Explain source, transformation, and freshness | Read |
-| `feedback.aggregate` | Aggregate feedback themes and sentiment | Read |
-| `scenario.run` | Generate controlled simulator behavior | Write |
-| `decision.evaluate` | Score a decision brief against expectations | Read |
-| `memory.retrieve` | Retrieve authorized DecisionOS memory | Read |
-| `memory.store` | Persist approved memory with retention metadata | Write |
-| `decision.record` | Persist a versioned evidence-backed decision | Write |
+| Tool | Resource | Purpose | Read/Write |
+|---|---|---|---|
+| `customer.snapshot` | customer | Retrieve an authorized cross-service customer snapshot | Read |
+| `analytics.query` | analytics | Execute a governed analytical query | Read |
+| `analytics.segment` | analytics | Compare a metric by approved segment | Read |
+| `analytics.funnel` | analytics | Calculate an approved funnel | Read |
+| `analytics.compare_periods` | analytics | Compare a metric across periods | Read |
+| `semantic.lookup` | semantic | Resolve a governed business term | Read |
+| `semantic.metric_definition` | semantic | Retrieve a metric definition | Read |
+| `semantic.entity_mapping` | semantic | Resolve an entity identifier | Read |
+| `graph.search` | graph | Search approved entity relationships | Read |
+| `graph.neighbors` | graph | Retrieve approved entity neighbors | Read |
+| `graph.paths` | graph | Find an approved relationship path | Read |
+| `graph.relationship_summary` | graph | Summarize entity relationships | Read |
+| `rag.search` | rag | Retrieve authorized document passages | Read |
+| `rag.document_lookup` | rag | Retrieve an authorized document | Read |
+| `rag.policy_retrieve` | rag | Retrieve an authorized policy | Read |
+| `permission.check` | governance | Check access to a resource | Read |
+| `decision.evaluate` | governance | Evaluate decision claims and evidence | Read |
+| `lineage.explain` | governance | Explain source and freshness metadata | Read |
 
 No write tool should be enabled for executive investigation until approval, audit, and rollback behavior are defined.

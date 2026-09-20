@@ -24,6 +24,8 @@ services=(
   "orchestration|orchestration_service.app:app|8008|orchestration_service/app.py"
 )
 
+agent_app_port="8009"
+
 free_port() {
   local port="$1"
   local pids
@@ -92,11 +94,25 @@ start_simulator() {
   service_pids+=("$!")
 }
 
+start_agent_app() {
+  local agent_app_module="Agent.app.main:app"
+  local agent_app_dir="$ROOT_DIR"
+
+  free_port "$agent_app_port"
+  echo "Starting agent app on http://$SERVICE_HOST:$agent_app_port"
+  PYTHONUNBUFFERED=1 "$PYTHON" -m uvicorn "$agent_app_module" \
+    --app-dir "$agent_app_dir" \
+    --host "$SERVICE_HOST" \
+    --port "$agent_app_port" &
+  service_pids+=("$!")
+}
+
 for service in "${services[@]}"; do
   IFS="|" read -r name module port module_file <<< "$service"
   start_service "$name" "$module" "$port" "$module_file"
 done
 start_simulator
+start_agent_app
 
 if [[ ${#service_pids[@]} -eq 0 ]]; then
   echo "No implemented services were found." >&2

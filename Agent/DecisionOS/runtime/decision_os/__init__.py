@@ -1,6 +1,8 @@
 """DecisionOS runtime foundation."""
 
 from .engine import InvestigationEngine
+from .agents import AgentFinding, AgentPack, AgentSpec, AgentTask
+from .semantic import MetricDefinition, SemanticLookup, SemanticRegistry
 from .models import (
     DecisionBrief,
     Evidence,
@@ -15,6 +17,13 @@ from .tools import ToolDispatcher, ToolSpec
 
 __all__ = [
     "DecisionBrief",
+    "AgentFinding",
+    "AgentPack",
+    "AgentSpec",
+    "AgentTask",
+    "MetricDefinition",
+    "SemanticLookup",
+    "SemanticRegistry",
     "Evidence",
     "Investigation",
     "InvestigationEngine",

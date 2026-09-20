@@ -29,7 +29,10 @@ Audit fields:
   "filters": {},
   "freshness": {},
   "warnings": [],
-  "request_id": "string"
+  "request_id": "string",
+  "generated_at": "timestamp",
+  "query_metadata": {},
+  "evidence_references": []
 }
 ```
 
