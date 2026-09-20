@@ -31,6 +31,7 @@ Tools are governed capabilities, not unrestricted access. Every tool must enforc
 | `rag.policy_retrieve` | rag | Retrieve an authorized policy | Read |
 | `permission.check` | governance | Check access to a resource | Read |
 | `decision.evaluate` | governance | Evaluate decision claims and evidence | Read |
+| `decision.record` | governance | Create a validated evidence-backed decision record | Read |
 | `lineage.explain` | governance | Explain source and freshness metadata | Read |
 
 No write tool should be enabled for executive investigation until approval, audit, and rollback behavior are defined.

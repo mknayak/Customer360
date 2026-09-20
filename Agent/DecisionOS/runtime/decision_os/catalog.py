@@ -40,11 +40,12 @@ TOOL_CATALOG: tuple[ToolContract, ...] = (
     ToolContract("graph.neighbors", "Retrieve approved entity neighbors.", "graph", _schema("entity_type", "entity_id", entity_type="string", entity_id="string", relationship_types="array", max_results="integer")),
     ToolContract("graph.paths", "Find an approved relationship path.", "graph", _schema("from_id", "to_id", from_id="string", to_id="string", max_depth="integer")),
     ToolContract("graph.relationship_summary", "Summarize entity relationships.", "graph", _schema("entity_type", "entity_id", entity_type="string", entity_id="string")),
-    ToolContract("rag.search", "Retrieve authorized document passages.", "rag", _schema("query", query="string")),
+    ToolContract("rag.search", "Retrieve authorized document passages.", "rag", _schema("query", query="string", principal_id="string", entity_type="string", entity_id="string", max_results="integer")),
     ToolContract("rag.document_lookup", "Retrieve an authorized document.", "rag", _schema("document_id", document_id="string")),
     ToolContract("rag.policy_retrieve", "Retrieve an authorized policy.", "rag", _schema("policy", policy="string")),
     ToolContract("permission.check", "Check access to a resource.", "governance", _schema("principal_id", "resource", principal_id="string", resource="string")),
     ToolContract("decision.evaluate", "Evaluate decision claims and evidence.", "governance", _schema("decision", "required_claims", decision="object", required_claims="array")),
+    ToolContract("decision.record", "Persist a validated evidence-backed decision record.", "governance", _schema("investigation_id", "decision_brief", investigation_id="string", decision_brief="object", required_claims="array", key_drivers="array", follow_up_questions="array")),
     ToolContract("lineage.explain", "Explain source and freshness metadata.", "governance", _schema("source", source="string")),
 )
 

@@ -384,6 +384,8 @@ Add a graph layer that helps answer relationship-driven questions and support mu
 
 ## Phase 7: RAG and GraphRAG foundation
 
+**Status: Complete (dependency-free runtime slice)**
+
 ### Goal
 Support unstructured business context and retrieval for plans, policies, reports, and briefing documents.
 
@@ -403,10 +405,10 @@ Support unstructured business context and retrieval for plans, policies, reports
 - executive memo retrieval
 
 ### Work items
-- Add document store and indexing pattern
-- Add retrieval API for policy and brief documents
-- Add hybrid retrieval combining vector + graph context
-- Add citation metadata for every retrieved document
+- [x] Add document store and indexing pattern
+- [x] Add retrieval API for policy and brief documents
+- [x] Add hybrid retrieval combining vector + graph context
+- [x] Add citation metadata for every retrieved document
 
 ### Acceptance criteria
 - Retrieved documents include source references and context snippets.
@@ -416,6 +418,8 @@ Support unstructured business context and retrieval for plans, policies, reports
 ---
 
 ## Phase 8: Evidence pipeline and validation
+
+**Status: Complete (dependency-free runtime slice)**
 
 ### Goal
 Ensure the system generates evidence-backed recommendations rather than unsupported narratives.
@@ -440,10 +444,10 @@ Every final answer should include:
 - recommendation gate
 
 ### Work items
-- Create `decision-record` output schema
-- Add evidence assembly from tools and retrieved sources
-- Add contradiction detection when sources disagree
-- Make recommendation output explicit and separate from facts
+- [x] Create `decision-record` output schema
+- [x] Add evidence assembly from tools and retrieved sources
+- [x] Add contradiction detection when sources disagree
+- [x] Make recommendation output explicit and separate from facts
 
 ### Acceptance criteria
 - A decision brief cannot be generated without evidence.
@@ -453,6 +457,8 @@ Every final answer should include:
 ---
 
 ## Phase 9: Decision orchestration and workflow execution
+
+**Status: Complete (dependency-free runtime slice)**
 
 ### Goal
 Turn multiple tool calls and domain investigations into a controlled executive decision workflow.
@@ -469,11 +475,11 @@ Turn multiple tool calls and domain investigations into a controlled executive d
 9. Surface confidence and limitations
 
 ### Work items
-- Add orchestration workflow state machine with durable record IDs
-- Add retry and timeout rules for service calls
-- Add compensation hooks for failed multi-step analyses
-- Add workflow idempotency for repeated investigations
-- Add decision summaries for auditability
+- [x] Add orchestration workflow state machine with durable record IDs
+- [x] Add retry and timeout rules for service calls
+- [x] Add compensation hooks for failed multi-step analyses
+- [x] Add workflow idempotency for repeated investigations
+- [x] Add decision summaries for auditability
 
 ### Acceptance criteria
 - A complex question can be completed without manual ad hoc coordination.

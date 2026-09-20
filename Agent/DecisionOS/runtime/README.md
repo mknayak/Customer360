@@ -11,8 +11,11 @@ This directory contains the first executable DecisionOS slice. It is intentional
 - `decision_os.engine`: investigation lifecycle state machine
 - `decision_os.persistence`: replaceable persistence protocol and in-memory adapter
 - `decision_os.evaluation`: deterministic claim evaluation primitives
+- `decision_os.evidence`: evidence assembly, validation, contradiction reporting, and recommendation gating
+- `decision_os.workflow`: durable workflow records, retries, timeouts, compensation, idempotency, and audit summaries
 - `decision_os.semantic`: versioned Customer360 metric definitions and governed lookup
 - `decision_os.graph`: allowlisted entity schema, refresh API, bounded relationship traversal, and graph tool handlers
+- `decision_os.rag`: permission-scoped document ingestion, deterministic embeddings, citation-rich retrieval, and GraphRAG handlers
 - `tests/`: focused runtime behavior tests
 
 Graphs can be rendered in Markdown-compatible viewers without an additional dependency:
@@ -35,4 +38,4 @@ From this directory:
 python -m pytest
 ```
 
-The runtime does not call LLMs or enterprise systems yet. Semantic lookups are resolved from the approved in-process metric registry, and graph records are refreshed through the typed `GraphStore.sync` port. Persistent graph and service-specific refresh jobs can be added behind these ports without changing governed tool callers.
+The runtime does not call LLMs or enterprise systems yet. Semantic lookups are resolved from the approved in-process metric registry, graph records are refreshed through the typed `GraphStore.sync` port, documents are indexed through the replaceable `DocumentStore` port, and workflow state uses a replaceable persistence port. Persistent graph, document, embedding, service, and workflow backends can be added behind these ports without changing governed tool callers.
