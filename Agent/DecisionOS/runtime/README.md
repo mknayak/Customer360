@@ -13,6 +13,10 @@ This directory contains the first executable DecisionOS slice. It is intentional
 - `decision_os.evaluation`: deterministic claim evaluation primitives
 - `decision_os.evidence`: evidence assembly, validation, contradiction reporting, and recommendation gating
 - `decision_os.workflow`: durable workflow records, retries, timeouts, compensation, idempotency, and audit summaries
+- `decision_os.durable`: SQLite semantic, graph, workflow, decision, and audit adapters
+- `decision_os.governance`: fail-closed authorization, consent, retention, and field-masking helpers
+- `decision_os.model_provider`: bounded model-provider protocol and deterministic test provider
+- `decision_os.investigation`: metric-gated investigation planning and bounded workflow execution
 - `decision_os.semantic`: versioned Customer360 metric definitions and governed lookup
 - `decision_os.graph`: allowlisted entity schema, refresh API, bounded relationship traversal, and graph tool handlers
 - `decision_os.rag`: permission-scoped document ingestion, deterministic embeddings, citation-rich retrieval, and GraphRAG handlers

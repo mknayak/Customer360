@@ -24,6 +24,8 @@ def test_ui_route_renders_prompt_box():
     html = response.text.lower()
     assert "customer360" in html
     assert "prompt" in html
+    assert "graph-load" in html
+    assert "graph-search" in html
 
 
 def test_chat_endpoint_runs_investigation_from_prompt():
@@ -156,6 +158,17 @@ def test_graph_sync_and_path_endpoint():
     assert path.json()["data"]["found"] is True
 
 
+def test_graph_neighbors_and_search_endpoints_support_ui_explorer():
+    client = TestClient(app)
+    client.post("/api/graph/sync", json={"entities": [{"entity_type": "customer", "entity_id": "customer-ui"}, {"entity_type": "product", "entity_id": "product-ui"}], "relationships": [{"from_type": "customer", "from_id": "customer-ui", "relationship_type": "customer_order", "to_type": "product", "to_id": "product-ui"}]})
+    neighbors = client.get("/api/graph/neighbors?entity_type=customer&entity_id=customer-ui")
+    assert neighbors.status_code == 200
+    assert neighbors.json()["data"]["neighbors"][0]["entity_id"] == "product-ui"
+    search = client.post("/api/graph/search", json={"query": "customer-ui"})
+    assert search.status_code == 200
+    assert search.json()["data"]["entities"][0]["entity_id"] == "customer-ui"
+
+
 def test_rag_ingestion_search_and_authorization():
     client = TestClient(app)
     ingest = client.post(
@@ -186,6 +199,16 @@ def test_rag_ingestion_search_and_authorization():
     assert result.status_code == 200
     assert result.json()["data"]["passages"][0]["document_id"] == "brief-agent-test"
     assert result.json()["evidence_references"][0].startswith("document-chunk:")
+
+
+def test_rag_answer_returns_citations_and_model_status():
+    client = TestClient(app)
+    client.post("/api/rag/documents", json={"document_id": "rag-answer-test", "title": "Finance policy", "content": "Revenue recognition requires approved order evidence.", "source": "finance:policy", "authorized_principals": ["cfo-1"]})
+    answer = client.post("/api/rag/answer", json={"query": "approved order evidence", "principal_id": "cfo-1"})
+    assert answer.status_code == 200
+    assert answer.json()["passages"]
+    assert answer.json()["evidence_references"]
+    assert client.get("/api/agent/model-status").status_code == 200
 
 
 def test_governed_investigation_routes_agents_and_builds_decision_record():

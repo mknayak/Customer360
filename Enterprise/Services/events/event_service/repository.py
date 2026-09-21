@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -8,7 +9,7 @@ from threading import RLock
 
 from .models import Event
 
-DEFAULT_DATABASE_PATH = Path(__file__).resolve().parents[1] / "data" / "events.sqlite3"
+DEFAULT_DATABASE_PATH = Path(os.getenv("EVENT_DATABASE", Path(__file__).resolve().parents[1] / "data" / "events.sqlite3"))
 
 
 class EventRepository:
@@ -45,6 +46,8 @@ class EventRepository:
             self.connection.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_idempotency ON events(idempotency_key) WHERE idempotency_key IS NOT NULL"
             )
+            self.connection.execute("CREATE TABLE IF NOT EXISTS consumer_checkpoints (consumer_id TEXT PRIMARY KEY, event_id TEXT NOT NULL, updated_at TEXT NOT NULL)")
+            self.connection.execute("CREATE TABLE IF NOT EXISTS dead_letters (dead_letter_id INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT NOT NULL, error TEXT NOT NULL, recorded_at TEXT NOT NULL)")
 
     @staticmethod
     def event(row: sqlite3.Row) -> Event:
@@ -130,3 +133,21 @@ class EventRepository:
     def close(self) -> None:
         with self.lock:
             self.connection.close()
+
+    def checkpoint(self, consumer_id: str) -> str | None:
+        row = self.connection.execute("SELECT event_id FROM consumer_checkpoints WHERE consumer_id = ?", (consumer_id,)).fetchone()
+        return row["event_id"] if row else None
+
+    def save_checkpoint(self, consumer_id: str, event_id: str) -> None:
+        from datetime import datetime, timezone
+        with self.lock, self.connection:
+            self.connection.execute("INSERT OR REPLACE INTO consumer_checkpoints VALUES (?, ?, ?)", (consumer_id, event_id, datetime.now(timezone.utc).isoformat()))
+
+    def dead_letter(self, payload: dict, error: str) -> None:
+        from datetime import datetime, timezone
+        with self.lock, self.connection:
+            self.connection.execute("INSERT INTO dead_letters (payload, error, recorded_at) VALUES (?, ?, ?)", (json.dumps(payload, sort_keys=True, default=str), error, datetime.now(timezone.utc).isoformat()))
+
+    def list_dead_letters(self, limit: int = 100) -> list[dict]:
+        with self.lock:
+            return [{"dead_letter_id": row[0], "payload": json.loads(row[1]), "error": row[2], "recorded_at": row[3]} for row in self.connection.execute("SELECT dead_letter_id, payload, error, recorded_at FROM dead_letters ORDER BY dead_letter_id DESC LIMIT ?", (limit,))]

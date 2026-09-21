@@ -21,6 +21,7 @@ from Agent.DecisionOS.runtime.decision_os.catalog import register_tool_catalog
 from Agent.DecisionOS.runtime.decision_os.graph import GraphStore, graph_tool_handlers
 from Agent.DecisionOS.runtime.decision_os.rag import Document, DocumentStore, GraphRAGRetriever, rag_tool_handlers
 from Agent.DecisionOS.runtime.decision_os.semantic import SemanticRegistry
+from Agent.DecisionOS.runtime.decision_os.model_provider import DeterministicModelProvider, OpenAICompatibleModelProvider, ModelRequest
 from Agent.DecisionOS.runtime.decision_os.tools import PermissionMap, ToolExecution, ToolDispatcher
 
 
@@ -163,20 +164,21 @@ def build_dispatcher() -> ToolDispatcher:
 app = FastAPI(title="Customer360 Agent App", version="0.1.0")
 service_adapters = ServiceAdapters.from_origins(
     {
-        "crm": "http://127.0.0.1:8001",
-        "product": "http://127.0.0.1:8002",
-        "shopping": "http://127.0.0.1:8003",
-        "site": "http://127.0.0.1:8004",
-        "feedback": "http://127.0.0.1:8005",
-        "marketing": "http://127.0.0.1:8006",
-        "events": "http://127.0.0.1:8007",
-        "orchestration": "http://127.0.0.1:8008",
+        "crm": os.getenv("CRM_ORIGIN", "http://127.0.0.1:8001"),
+        "product": os.getenv("PRODUCT_ORIGIN", "http://127.0.0.1:8002"),
+        "shopping": os.getenv("SHOPPING_ORIGIN", "http://127.0.0.1:8003"),
+        "site": os.getenv("SITE_ORIGIN", "http://127.0.0.1:8004"),
+        "feedback": os.getenv("FEEDBACK_ORIGIN", "http://127.0.0.1:8005"),
+        "marketing": os.getenv("MARKETING_ORIGIN", "http://127.0.0.1:8006"),
+        "events": os.getenv("EVENTS_ORIGIN", "http://127.0.0.1:8007"),
+        "orchestration": os.getenv("ORCHESTRATION_ORIGIN", "http://127.0.0.1:8008"),
     }
 )
 semantic_registry = SemanticRegistry()
 graph_store = GraphStore()
 document_store = DocumentStore()
 rag_retriever = GraphRAGRetriever(document_store, graph_store)
+model_provider = OpenAICompatibleModelProvider.from_environment() or DeterministicModelProvider()
 engine = InvestigationEngine(InMemoryPersistence(), build_dispatcher())
 agent_pack = AgentPack()
 evidence_pipeline = EvidencePipeline()
@@ -211,6 +213,9 @@ def build_executive_brief(
     conversation_id: str | None = None,
     executive_role: str = "CFO",
 ) -> dict[str, Any]:
+    permission = PERMISSIONS(principal_id, "analytics")
+    if not permission.allowed:
+        raise HTTPException(status_code=403, detail=permission.reason)
     metric, metric_label, metric_unit = resolve_metric(prompt)
     investigation = engine.create(prompt, principal_id)
     prepared = engine.plan(investigation.investigation_id, {"goal": "investigate_prompt", "scope": "executive"})
@@ -224,6 +229,15 @@ def build_executive_brief(
     result = updated.tool_results[-1]
     value = result.data.get("value", 0) if isinstance(result.data, Mapping) else 0
     answer, facts, follow_up_questions = format_metric_answer(metric, metric_label, value, metric_unit)
+    model_used = "deterministic"
+    if isinstance(model_provider, OpenAICompatibleModelProvider):
+        try:
+            model_response = model_provider.complete(ModelRequest(prompt, tuple(facts), ("semantic.lookup", "analytics.query", "rag.search", "graph.search")))
+            answer = model_response.text
+            model_used = model_response.model
+        except Exception as error:
+            facts.append("Configured LLM synthesis failed; the governed deterministic answer was retained.")
+            follow_up_questions.append(f"LLM synthesis unavailable: {error}")
     live = result.query_metadata.get("live") is True
     source_label = result.source[0] if result.source else "analytics.query"
     resolved_conversation_id = conversation_id or investigation.investigation_id
@@ -233,6 +247,7 @@ def build_executive_brief(
       "investigation_id": investigation.investigation_id,
       "conversation_id": resolved_conversation_id,
     "executive_role": executive_role,
+    "model": model_used,
       "status": "validating",
       "question": prompt,
         "answer": answer,
@@ -269,6 +284,11 @@ def adapter_health():
   return service_adapters.health()
 
 
+@app.get("/api/agent/model-status")
+def model_status() -> dict[str, str | bool]:
+        return {"configured": isinstance(model_provider, OpenAICompatibleModelProvider), "provider": getattr(model_provider, "model", "deterministic-test")}
+
+
 @app.post("/api/semantic/lookup")
 def semantic_lookup(payload: dict[str, Any]) -> dict[str, Any]:
     return semantic_registry.lookup_execution(payload).__dict__
@@ -283,6 +303,16 @@ def sync_graph(payload: dict[str, Any]) -> dict[str, Any]:
 @app.get("/api/graph/paths")
 def graph_paths(from_id: str, to_id: str, max_depth: int = 6) -> dict[str, Any]:
     return graph_store.paths(from_id, to_id, max_depth).__dict__
+
+
+@app.get("/api/graph/neighbors")
+def graph_neighbors(entity_type: str, entity_id: str, max_results: int = 100) -> dict[str, Any]:
+    return graph_store.neighbors(entity_type, entity_id, max_results=max_results).__dict__
+
+
+@app.post("/api/graph/search")
+def graph_search(payload: dict[str, Any]) -> dict[str, Any]:
+    return graph_store.search(payload["query"], payload.get("max_results", 25)).__dict__
 
 
 @app.post("/api/rag/documents")
@@ -314,6 +344,17 @@ def search_documents(payload: dict[str, Any]) -> dict[str, Any]:
         payload.get("max_results", 10),
     )
     return result.__dict__
+
+
+@app.post("/api/rag/answer")
+def answer_from_rag(payload: dict[str, Any]) -> dict[str, Any]:
+    query = payload["query"]
+    principal_id = payload.get("principal_id", "system")
+    result = rag_retriever.search(query, principal_id, payload.get("entity_type"), payload.get("entity_id"), payload.get("max_results", 5))
+    passages = result.data.get("passages", []) if isinstance(result.data, Mapping) else []
+    context = tuple(f"[{item['chunk_id']}] {item['passage']}" for item in passages)
+    response = model_provider.complete(ModelRequest(query, context, ("rag.search", "graph.search"))) if context else None
+    return {"answer": response.text if response else "No authorized document passages matched the query.", "provider": response.provider if response else None, "model": response.model if response else None, "passages": passages, "graph_context": result.data.get("graph_context") if isinstance(result.data, Mapping) else None, "evidence_references": result.evidence_references, "warnings": result.warnings}
 
 
 @app.get("/api/rag/documents/{document_id}")

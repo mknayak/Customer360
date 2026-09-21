@@ -67,3 +67,14 @@ def test_contract_catalog_and_batch_replay_cursor(tmp_path):
         "source_service": "content-site", "event_type": "Unknown", "aggregate_type": "x", "aggregate_id": "x", "payload": {}
     })
     assert invalid.status_code == 422
+    assert client.get("/api/dead-letters").json()[0]["error"]
+
+
+def test_consumer_checkpoint_poll_and_ack(tmp_path):
+    app_module.repository = EventRepository(tmp_path / "events.sqlite3")
+    client = TestClient(app_module.app)
+    event = client.post("/api/events", json={"source_service": "content-site", "event_type": "PageVisit", "aggregate_type": "content_session", "aggregate_id": "s1", "correlation_id": "s1", "payload": {}}).json()
+    poll = client.get("/api/consumers/warehouse/poll").json()
+    assert poll["events"][0]["event_id"] == event["event_id"]
+    assert client.post(f"/api/consumers/warehouse/ack", json={"event_id": event["event_id"]}).status_code == 200
+    assert client.get("/api/consumers/warehouse/poll").json()["events"] == []

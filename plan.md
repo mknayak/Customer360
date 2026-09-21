@@ -235,10 +235,13 @@ The phases below extend the local MVP roadmap into the production-capable Enterp
 - [ ] Select and document the production messaging option and local development equivalent
 - [x] Define a local event contract registry for event names, source services, payload shape, and schema version
 - [ ] Finalize production ordering, compatibility, and evolution rules
-- [ ] Add publisher retries, consumer retries, dead-letter handling, and idempotent consumers
+- [x] Add local dead-letter storage and idempotent event append behavior
+- [ ] Add production publisher/consumer retries and dead-letter delivery
 - [x] Add bounded batch ingestion and replay cursor support
-- [ ] Add consumer registration, offsets/checkpoints, dead-letter handling, and event delivery metrics
+- [x] Add consumer poll, acknowledgement, and checkpoint APIs
+- [ ] Add consumer registration, delivery metrics, and production offsets
 - [x] Add Event service contract and idempotency tests
+- [x] Add Event service consumer checkpoint and dead-letter tests
 - [ ] Add contract tests for every service-owned publisher
 - [ ] Emit workflow failure and completion events
 
@@ -253,7 +256,8 @@ The phases below extend the local MVP roadmap into the production-capable Enterp
 - [ ] Expose scenario selection, seed, scale, date range, and behavior parameters in the simulator UI
 - [ ] Generate promotion uplift, website degradation, product surge, site launch, and feedback patterns through real service workflows
 - [x] Record stable scenario event IDs, seeds, schema versions, idempotency keys, correlation IDs, and causation IDs
-- [ ] Add reset, replay, and verification commands for generated datasets
+- [x] Add deterministic event replay and service-count verification hooks
+- [ ] Add reset commands and full multi-service dataset verification
 
 **Acceptance criteria:** The same scenario seed produces reproducible service records, events, KPIs, and investigation results.
 
@@ -263,9 +267,10 @@ The phases below extend the local MVP roadmap into the production-capable Enterp
 
 - [x] Extend raw and curated SQLite layers with content activity and finance facts
 - [x] Add basic data quality metadata for raw event count, latest event time, and curated row counts
+- [x] Add metric catalog, lineage metadata, quality checks, and operational reconciliation endpoints
 - [ ] Add batch and streaming ingestion paths with raw, cleansed, curated, and analytical layers
 - [ ] Add complete data quality checks for completeness, uniqueness, freshness, referential integrity, and reconciliation
-- [ ] Add catalog and lineage metadata for every curated metric
+- [ ] Expand catalog and lineage metadata to every curated metric and dimension
 - [ ] Add time-period, site, region, channel, segment, product, promotion, and new-versus-existing customer dimensions
 - [x] Add finance model fields and KPIs for revenue, cost, margin, profit, and promotion-linked orders
 - [ ] Add finance sources for forecast, budget variance, and complete promotion economics
@@ -277,12 +282,18 @@ The phases below extend the local MVP roadmap into the production-capable Enterp
 
 **Goal:** Make business concepts, relationships, definitions, and lineage durable and consistently resolvable.
 
-- [ ] Move metric definitions from the in-process registry to a versioned durable semantic catalog
+- [x] Add a SQLite-backed versioned semantic catalog adapter
+- [x] Add metric service/analytics/graph mappings and deprecation metadata
+- [ ] Move metric definitions to a production-managed semantic catalog
 - [ ] Map business terms to service APIs, analytical models, graph entities, formulas, owners, effective dates, and security classifications
-- [ ] Add ambiguity, deprecation, and definition-conflict workflows
-- [ ] Replace the in-process graph with a durable graph store and repeatable synchronization jobs
+- [x] Add local definition registration and deprecation controls
+- [ ] Add durable ambiguity and definition-conflict workflows
+- [x] Add a durable SQLite graph adapter preserving bounded graph query contracts
+- [ ] Replace the local graph adapter with a production graph store and repeatable synchronization jobs
 - [ ] Add graph refresh checkpoints, source lineage, entity resolution, and relationship quality checks
 - [ ] Replace dependency-free document/vector retrieval with production stores and embedding providers
+- [x] Add citation-backed RAG answer API with authorized passages and optional graph context
+- [x] Add clickable graph search and neighbor exploration in the executive UI
 
 **Acceptance criteria:** An investigation resolves the same business term consistently across API, analytics, graph, and document retrieval, with versioned lineage.
 
@@ -290,10 +301,14 @@ The phases below extend the local MVP roadmap into the production-capable Enterp
 
 **Goal:** Make investigations, decisions, evidence, memory, and audits durable, reviewable, and policy-controlled.
 
-- [ ] Implement durable persistence for investigations, workflow state, evidence packages, decisions, memory, and audit events
+- [x] Implement local durable SQLite persistence for investigations, decisions, workflows, and audit entries
+- [x] Persist evidence records and retention-aware memory records locally
+- [ ] Persist evidence packages and memory with production retention and versioning semantics
 - [ ] Add immutable evidence references and versioned decision records
-- [ ] Enforce retention, deletion, legal hold, correction, and consent policies
-- [ ] Add row-level and field-level authorization, PII masking, aggregation thresholds, and sensitivity labels
+- [x] Add fail-closed consent, retention-expiry, and field-masking policy helpers
+- [x] Add local retention purge and evidence audit tests
+- [ ] Enforce retention, deletion, legal hold, correction, aggregation thresholds, and sensitivity labels in durable stores
+- [ ] Add row-level and field-level authorization to every service and retrieval adapter
 - [ ] Add authentication, RBAC, service identity, secret management, and authorization audit inspection
 - [ ] Ensure every tool fails closed when authorization or policy evaluation is unavailable
 
@@ -303,8 +318,10 @@ The phases below extend the local MVP roadmap into the production-capable Enterp
 
 **Goal:** Replace deterministic demonstration behavior with a governed, model-backed investigation loop.
 
-- [ ] Add an LLM provider abstraction with timeout, quota, retry, and failure handling
-- [ ] Implement question intake, scope clarification, entity and metric identification, investigation planning, and bounded tool execution
+- [x] Add a bounded model-provider protocol and deterministic test provider
+- [x] Implement metric-gated investigation planning and bounded workflow execution
+- [x] Add an OpenAI-compatible external model provider selected by `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`
+- [ ] Add an approved external LLM provider with timeout, quota, retry, and failure handling
 - [ ] Route work to domain agents using explicit role, tool, memory, and escalation contracts
 - [ ] Require semantic lookup before quantitative queries and permission checks before retrieval
 - [ ] Validate claims, contradictions, confidence, causality limits, and recommendation eligibility before synthesis
@@ -317,7 +334,8 @@ The phases below extend the local MVP roadmap into the production-capable Enterp
 **Goal:** Cover the cross-service journeys and executive analyses required by the blueprint.
 
 - [ ] Add checkout, payment, cancellation, fulfillment, and compensation workflow steps
-- [ ] Add workflow idempotency keys, retries, timeouts, recovery, and operator status controls
+- [x] Use workflow idempotency keys, retries, timeouts, compensation hooks, and durable status records
+- [ ] Add operator recovery and status controls for production workflows
 - [ ] Add before/during/after promotion analysis with incrementality limitations
 - [ ] Add mobile funnel, site, channel, region, segment, product, and cohort breakdowns
 - [ ] Add complaint, sentiment, topic, intent, product, and site relationships for Voice of Customer analysis
@@ -332,8 +350,10 @@ The phases below extend the local MVP roadmap into the production-capable Enterp
 - [ ] Add deployment configuration, environment-specific settings, migrations, backups, and recovery procedures
 - [ ] Add service health, dependency health, event lag, data freshness, tool latency, model usage, and failure dashboards
 - [ ] Add distributed request, correlation, and audit tracing without exposing secrets or hidden reasoning
-- [ ] Add regression fixtures for permissions, stale data, missing data, contradictory evidence, and unsupported causality
-- [ ] Add quality, latency, cost, and groundedness evaluation for every target executive question
+- [x] Add regression fixtures for permissions and groundedness across the six target executive questions
+- [x] Add a runnable quality/groundedness evaluation harness for every target executive question
+- [ ] Add regression fixtures for stale data, missing data, contradictory evidence, and unsupported causality
+- [ ] Add latency, cost, and model-usage evaluation
 - [ ] Document operational runbooks, incident response, rollback, and data repair procedures
 
 **Acceptance criteria:** The platform can be deployed from documented configuration, monitored during a representative workload, recovered from a tested failure, and pass the end-to-end evaluation suite.

@@ -1,20 +1,21 @@
 """Local static server and same-origin proxy for the Shopping Simulator."""
 
+import os
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).parent
-CRM_ORIGIN = "http://127.0.0.1:8001"
-PRODUCT_ORIGIN = "http://127.0.0.1:8002"
-SHOPPING_ORIGIN = "http://127.0.0.1:8003"
-SITE_ORIGIN = "http://127.0.0.1:8004"
-FEEDBACK_ORIGIN = "http://127.0.0.1:8005"
-MARKETING_ORIGIN = "http://127.0.0.1:8006"
-EVENTS_ORIGIN = "http://127.0.0.1:8007"
-ORCHESTRATION_ORIGIN = "http://127.0.0.1:8008"
-DATA_PLATFORM_ORIGIN = "http://127.0.0.1:8010"
+CRM_ORIGIN = os.getenv("CRM_ORIGIN", "http://127.0.0.1:8001")
+PRODUCT_ORIGIN = os.getenv("PRODUCT_ORIGIN", "http://127.0.0.1:8002")
+SHOPPING_ORIGIN = os.getenv("SHOPPING_ORIGIN", "http://127.0.0.1:8003")
+SITE_ORIGIN = os.getenv("SITE_ORIGIN", "http://127.0.0.1:8004")
+FEEDBACK_ORIGIN = os.getenv("FEEDBACK_ORIGIN", "http://127.0.0.1:8005")
+MARKETING_ORIGIN = os.getenv("MARKETING_ORIGIN", "http://127.0.0.1:8006")
+EVENTS_ORIGIN = os.getenv("EVENTS_ORIGIN", "http://127.0.0.1:8007")
+ORCHESTRATION_ORIGIN = os.getenv("ORCHESTRATION_ORIGIN", "http://127.0.0.1:8008")
+DATA_PLATFORM_ORIGIN = os.getenv("DATA_PLATFORM_ORIGIN", "http://127.0.0.1:8010")
 
 
 PROXY_ORIGINS = {
@@ -90,6 +91,8 @@ class SimulatorHandler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    server = ThreadingHTTPServer(("127.0.0.1", 8080), SimulatorHandler)
-    print("Shopping Simulator running at http://127.0.0.1:8080")
+    host = os.getenv("SERVICE_HOST", "127.0.0.1")
+    port = int(os.getenv("SIMULATOR_PORT", "8080"))
+    server = ThreadingHTTPServer((host, port), SimulatorHandler)
+    print(f"Shopping Simulator running at http://{host}:{port}")
     server.serve_forever()

@@ -45,6 +45,14 @@
       .loading { opacity: .55; }
       .brief-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; color: var(--muted); font-size: 13px; }
       .brief-meta span { border-left: 2px solid var(--teal); padding-left: 8px; }
+      .graph-panel { grid-column: 1 / -1; }
+      .graph-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+      .graph-controls input, .graph-controls select { border: 1px solid var(--line); background: white; padding: 10px; flex: 0 1 180px; }
+      .graph-controls button { min-height: 42px; }
+      .graph-canvas { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-height: 80px; }
+      .graph-node { border: 1px solid var(--teal); background: #e9f5f3; color: var(--ink); padding: 12px 14px; text-align: left; }
+      .graph-node:hover { background: var(--lime, #d8ef9a); }
+      .graph-edge { color: var(--muted); font-size: 12px; }
       @media (max-width: 800px) { header { padding: 20px; } main { padding: 34px 20px; } .intro, .workspace { grid-template-columns: 1fr; gap: 24px; } .answer { grid-row: auto; } .evidence { grid-column: auto; grid-template-columns: 1fr; } .question-bar { flex-direction: column; } button { min-height: 48px; } }
     </style>
   </head>
@@ -58,11 +66,35 @@
         <article class="panel"><h2>Primary signal</h2><div class="metric"><span id="metric-label">Awaiting query</span><span class="metric-value" id="metric-value">—</span></div><div class="bar"><span id="metric-bar" style="width:0"></span></div></article>
         <article class="panel"><h2>Next actions</h2><ul class="list" id="recommendations"><li class="empty">Investigate a question to see recommended next actions.</li></ul></article>
         <article class="panel evidence"><div><h2>Evidence &amp; lineage</h2><div id="evidence-list" class="empty">No evidence retrieved yet.</div></div><div><h2>Follow-up questions</h2><ul class="list" id="follow-ups"><li class="empty">Suggested follow-ups will appear here.</li></ul><h2 style="margin-top:24px">Conversation history</h2><ul class="list" id="history"><li class="empty">No prior questions.</li></ul></div></article>
+        <article class="panel graph-panel"><h2>Knowledge graph</h2><div class="graph-controls"><select id="graph-entity-type" aria-label="Graph entity type"><option value="customer">Customer</option><option value="product">Product</option><option value="site">Site</option><option value="order">Order</option><option value="campaign">Campaign</option><option value="promotion">Promotion</option></select><input id="graph-entity-id" placeholder="Entity ID, for example customer-1" aria-label="Graph entity ID"><button type="button" id="graph-load">Explore</button><input id="graph-search-query" placeholder="Search graph entities" aria-label="Graph search query"><button type="button" id="graph-search">Search</button></div><div id="graph-status" class="empty">Enter an entity ID or search term.</div><div id="graph-canvas" class="graph-canvas"></div></article>
       </section>
     </main>
     <script>
       const form = document.getElementById('question-form');
+      const graphCanvas = document.getElementById('graph-canvas');
+      const graphStatus = document.getElementById('graph-status');
           const setList = (id, values) => { document.getElementById(id).innerHTML = (values || []).map(value => `<li>${value}</li>`).join('') || '<li class="empty">None recorded.</li>'; };
+      const graphNode = (node, primary = false) => `<button type="button" class="graph-node" data-graph-type="${node.entity_type}" data-graph-id="${node.entity_id}"><strong>${node.entity_type}</strong><br><small>${node.entity_id}</small></button>`;
+      async function loadGraphNeighbors(entityType, entityId) {
+        graphStatus.textContent = 'Loading relationships…';
+        const response = await fetch(`/api/graph/neighbors?entity_type=${encodeURIComponent(entityType)}&entity_id=${encodeURIComponent(entityId)}`);
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Graph query failed');
+        const nodes = [result.data.entity, ...(result.data.neighbors || [])];
+        graphCanvas.innerHTML = nodes.map((node, index) => `${index ? '<span class="graph-edge">related to</span>' : ''}${graphNode(node)}`).join('');
+        graphStatus.textContent = `${result.data.neighbors?.length || 0} relationships · graph version ${result.freshness?.graph_version ?? '—'}`;
+      }
+      async function searchGraph(query) {
+        graphStatus.textContent = 'Searching graph…';
+        const response = await fetch('/api/graph/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, max_results: 25}) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Graph search failed');
+        graphCanvas.innerHTML = (result.data.entities || []).map(node => graphNode(node)).join('') || '<span class="empty">No graph entities matched.</span>';
+        graphStatus.textContent = `${result.data.entities?.length || 0} entities found`;
+      }
+      document.getElementById('graph-load').addEventListener('click', () => loadGraphNeighbors(document.getElementById('graph-entity-type').value, document.getElementById('graph-entity-id').value.trim()).catch(error => { graphStatus.textContent = error.message; }));
+      document.getElementById('graph-search').addEventListener('click', () => searchGraph(document.getElementById('graph-search-query').value.trim()).catch(error => { graphStatus.textContent = error.message; }));
+      graphCanvas.addEventListener('click', event => { const node = event.target.closest('[data-graph-id]'); if (node) loadGraphNeighbors(node.dataset.graphType, node.dataset.graphId).catch(error => { graphStatus.textContent = error.message; }); });
       form.addEventListener('submit', async event => {
         event.preventDefault();
             const prompt = document.getElementById('prompt').value.trim();

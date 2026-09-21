@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -29,6 +29,9 @@ class MetricDefinition:
     aliases: tuple[str, ...] = ()
     classification: str = "internal"
     null_handling: str = "Exclude null inputs from numerator and denominator."
+    mappings: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    deprecated: bool = False
+    deprecation_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -49,6 +52,17 @@ class SemanticRegistry:
 
     def definitions(self) -> tuple[MetricDefinition, ...]:
         return tuple(self._definitions.values())
+
+    def register(self, definition: MetricDefinition) -> None:
+        if definition.metric_id in self._definitions and self._definitions[definition.metric_id].version == definition.version:
+            raise ValueError(f"Metric definition already registered: {definition.metric_id} {definition.version}")
+        self._definitions[definition.metric_id] = definition
+
+    def deprecate(self, metric_id: str, reason: str) -> None:
+        definition = self._definitions.get(metric_id)
+        if definition is None:
+            raise KeyError(metric_id)
+        self._definitions[metric_id] = replace(definition, deprecated=True, deprecation_reason=reason)
 
     def lookup(
         self,
@@ -140,6 +154,9 @@ class SemanticRegistry:
             "effective_from": definition.effective_from,
             "freshness_sla_hours": definition.freshness_sla_hours,
             "classification": definition.classification,
+            "mappings": definition.mappings,
+            "deprecated": definition.deprecated,
+            "deprecation_reason": definition.deprecation_reason,
         }
 
 

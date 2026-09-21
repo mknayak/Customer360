@@ -9,6 +9,12 @@ from pydantic import BaseModel, Field
 
 class EventBatch(BaseModel):
     events: list[EventCreate] = Field(min_length=1, max_length=10_000)
+
+
+class ConsumerAck(BaseModel):
+    event_id: str = Field(min_length=1)
+
+
 from .repository import EventRepository
 
 app = FastAPI(title="Customer360 Event Service", version="0.1.0")
@@ -26,6 +32,7 @@ def append_event(payload: EventCreate) -> Event:
     try:
         validate_event_contract(payload.model_dump())
     except ValueError as error:
+        repository.dead_letter(payload.model_dump(), str(error))
         raise HTTPException(status_code=422, detail=str(error)) from error
     return repository.append(Event(**payload.model_dump()))
 
@@ -37,6 +44,7 @@ def append_event_batch(batch: EventBatch) -> list[Event]:
         try:
             validate_event_contract(payload.model_dump())
         except ValueError as error:
+            repository.dead_letter(payload.model_dump(), str(error))
             raise HTTPException(status_code=422, detail=str(error)) from error
         events.append(repository.append(Event(**payload.model_dump())))
     return events
@@ -45,6 +53,27 @@ def append_event_batch(batch: EventBatch) -> list[Event]:
 @app.get("/api/contracts")
 def event_contracts() -> dict[str, tuple[str, ...]]:
     return EVENT_CONTRACTS
+
+
+@app.get("/api/consumers/{consumer_id}/poll")
+def poll_consumer(consumer_id: str, limit: int = Query(default=100, ge=1, le=1000)) -> dict[str, object]:
+    cursor = repository.checkpoint(consumer_id)
+    events = repository.list_events(limit=10_000)
+    if cursor:
+        event_ids = [event.event_id for event in events]
+        events = events[event_ids.index(cursor) + 1:] if cursor in event_ids else events
+    return {"consumer_id": consumer_id, "checkpoint": cursor, "events": events[:limit]}
+
+
+@app.post("/api/consumers/{consumer_id}/ack")
+def acknowledge_consumer(consumer_id: str, payload: ConsumerAck) -> dict[str, str]:
+    repository.save_checkpoint(consumer_id, payload.event_id)
+    return {"consumer_id": consumer_id, "checkpoint": payload.event_id}
+
+
+@app.get("/api/dead-letters")
+def dead_letters(limit: int = Query(default=100, ge=1, le=1000)) -> list[dict]:
+    return repository.list_dead_letters(limit)
 
 
 @app.get("/api/events", response_model=list[Event])

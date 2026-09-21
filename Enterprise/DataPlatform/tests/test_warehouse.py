@@ -63,4 +63,6 @@ def test_content_and_finance_models_are_curated(tmp_path):
     assert warehouse.kpi("profit")["value"] == 40
     assert warehouse.kpi("gross_margin")["value"] == 0.4
     assert warehouse.quality()["curated_tables"]["finance"] == 1
+    assert any(item["metric"] == "revenue" for item in warehouse.catalog())
+    assert warehouse.reconcile({"revenue": 100, "visits": 0})["status"] == "matched"
     warehouse.close()

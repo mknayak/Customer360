@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -13,7 +14,7 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 
-DEFAULT_DATABASE_PATH = Path(__file__).resolve().parents[1] / "data" / "analytics.sqlite3"
+DEFAULT_DATABASE_PATH = Path(os.getenv("ANALYTICS_DATABASE", Path(__file__).resolve().parents[1] / "data" / "analytics.sqlite3"))
 
 
 class EventWarehouse:
@@ -216,7 +217,24 @@ class EventWarehouse:
         with self.lock:
             raw_count = self.connection.execute("SELECT COUNT(*) AS value FROM raw_events").fetchone()["value"]
             latest = self.connection.execute("SELECT MAX(occurred_at) AS value FROM raw_events").fetchone()["value"]
-            return {"raw_events": raw_count, "latest_occurred_at": latest, "curated_tables": {"visits": self.connection.execute("SELECT COUNT(*) AS value FROM curated_visits").fetchone()["value"], "content_activity": self.connection.execute("SELECT COUNT(*) AS value FROM curated_content_activity").fetchone()["value"], "finance": self.connection.execute("SELECT COUNT(*) AS value FROM curated_finance").fetchone()["value"]}}
+            missing_times = self.connection.execute("SELECT COUNT(*) AS value FROM raw_events WHERE occurred_at = ''").fetchone()["value"]
+            return {"raw_events": raw_count, "latest_occurred_at": latest, "checks": {"missing_occurred_at": missing_times, "passed": missing_times == 0}, "curated_tables": {"visits": self.connection.execute("SELECT COUNT(*) AS value FROM curated_visits").fetchone()["value"], "content_activity": self.connection.execute("SELECT COUNT(*) AS value FROM curated_content_activity").fetchone()["value"], "finance": self.connection.execute("SELECT COUNT(*) AS value FROM curated_finance").fetchone()["value"]}}
+
+    def catalog(self) -> list[dict[str, Any]]:
+        return [
+            {"metric": "revenue", "definition": "Succeeded order total", "source": "curated_orders", "grain": "order", "lineage": "OrderCreated -> curated_orders", "owner": "finance"},
+            {"metric": "conversion", "definition": "Succeeded orders divided by visits", "source": "curated_visits+curated_orders", "grain": "period", "lineage": "VisitStarted + OrderCreated", "owner": "digital"},
+            {"metric": "content_views", "definition": "Count of content view events", "source": "curated_content_activity", "grain": "content event", "lineage": "ContentView -> curated_content_activity", "owner": "digital"},
+            {"metric": "gross_margin", "definition": "Revenue less cost divided by revenue", "source": "curated_finance", "grain": "order", "lineage": "OrderCreated -> curated_finance", "owner": "finance"},
+        ]
+
+    def reconcile(self, operational: Mapping[str, Any]) -> dict[str, Any]:
+        checks = {}
+        for metric in ("revenue", "visits"):
+            analytical = self.kpi(metric)["value"]
+            expected = operational.get(metric)
+            checks[metric] = {"analytical": analytical, "operational": expected, "delta": None if expected is None else analytical - expected, "matched": expected is None or analytical == expected}
+        return {"status": "matched" if all(item["matched"] for item in checks.values()) else "mismatch", "checks": checks}
 
     @staticmethod
     def _event_id(event: Mapping[str, Any]) -> str:

@@ -48,3 +48,13 @@ def get_kpi(metric: str) -> dict[str, Any]:
 @app.get("/api/quality")
 def data_quality() -> dict[str, Any]:
     return warehouse.quality()
+
+
+@app.get("/api/catalog")
+def metric_catalog() -> list[dict[str, Any]]:
+    return warehouse.catalog()
+
+
+@app.post("/api/reconcile")
+def reconcile(payload: dict[str, Any]) -> dict[str, Any]:
+    return warehouse.reconcile(payload)
