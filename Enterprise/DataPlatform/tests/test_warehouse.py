@@ -55,11 +55,13 @@ def test_content_and_finance_models_are_curated(tmp_path):
         {"event_id": "session-1", "source_service": "content-site", "event_type": "PageVisit", "aggregate_type": "content_session", "aggregate_id": "session-1", "correlation_id": "session-1", "occurred_at": "2026-01-01T00:00:00Z", "payload": {"session_id": "session-1"}},
         {"event_id": "view-1", "source_service": "content-site", "event_type": "ContentView", "aggregate_type": "content_page", "aggregate_id": "about", "correlation_id": "session-1", "occurred_at": "2026-01-01T00:01:00Z", "payload": {"session_id": "session-1", "content_id": "about"}},
         {"event_id": "time-1", "source_service": "content-site", "event_type": "TimeOnPage", "aggregate_type": "content_page", "aggregate_id": "about", "correlation_id": "session-1", "occurred_at": "2026-01-01T00:02:00Z", "payload": {"session_id": "session-1", "duration_seconds": 20}},
+        {"event_id": "exit-1", "source_service": "content-site", "event_type": "Exit", "aggregate_type": "content_session", "aggregate_id": "session-1", "correlation_id": "session-1", "occurred_at": "2026-01-01T00:02:30Z", "payload": {"session_id": "session-1", "last_page": "about"}},
         {"event_id": "finance-1", "source_service": "shopping", "event_type": "OrderCreated", "aggregate_type": "order", "aggregate_id": "order-1", "occurred_at": "2026-01-01T00:03:00Z", "payload": {"customer_id": "customer-1", "payment_status": "succeeded", "total_amount": 100, "cost_amount": 60, "promotion_id": "promotion-1"}},
     ])
     assert warehouse.kpi("content_views")["value"] == 1
     assert warehouse.kpi("content_sessions")["value"] == 1
     assert warehouse.kpi("average_time_on_page")["value"] == 20
+    assert warehouse.kpi("page_dropoff")["value"] == [{"page": "about", "exits": 1}]
     assert warehouse.kpi("profit")["value"] == 40
     assert warehouse.kpi("gross_margin")["value"] == 0.4
     assert warehouse.quality()["curated_tables"]["finance"] == 1

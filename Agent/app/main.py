@@ -72,6 +72,7 @@ def resolve_metric(prompt: str) -> tuple[str, str, str]:
     ):
         return "segment_conversion", "Segment conversion", "results"
     candidates = (
+        ("page_dropoff", "Most dropped page", "pages"),
         ("product_performance", "Product performance", "results"),
         ("cart_abandonment", "Cart abandonment", "%"),
         ("conversion", "Conversion rate", "%"),
@@ -80,6 +81,7 @@ def resolve_metric(prompt: str) -> tuple[str, str, str]:
         ("revenue", "Revenue", "USD"),
     )
     keywords = {
+        "page_dropoff": ("dropped page", "drop off", "dropoff", "page exit", "exited page", "bounce page"),
         "product_performance": ("product", "sku", "units", "sell-through", "underperform"),
         "cart_abandonment": ("abandon", "cart"),
         "conversion": ("conversion", "funnel"),
@@ -123,6 +125,18 @@ def format_metric_answer(metric: str, label: str, value: Any, unit: str) -> tupl
         facts = [f"{product_name(row)}: {row['units']} units and {row['revenue']:.2f} revenue" for row in rows[:3]]
         follow_ups = ["Which products are underperforming relative to forecast?", "Which category contributes most revenue?"]
         return answer, facts, follow_ups
+    if metric == "page_dropoff":
+        rows = value if isinstance(value, list) else []
+        if not rows:
+            return (
+                "No page-dropoff events are available yet.",
+                ["The analytics store has no recorded content Exit events."],
+                ["Run the user-visit simulation to generate page activity."],
+            )
+        top = rows[0]
+        answer = f"The most dropped page is {top['page']} with {top['exits']} exits."
+        facts = [f"{row['page']}: {row['exits']} exits" for row in rows[:5]]
+        return answer, facts, ["What content or device segment has the highest dropoff?", "What was the average time on the dropped page?"]
     numeric = float(value or 0)
     display_value = numeric * 100 if unit == "%" else numeric
     formatted = f"{display_value:,.2f}" if unit in {"USD", "%"} else f"{display_value:,.0f}"

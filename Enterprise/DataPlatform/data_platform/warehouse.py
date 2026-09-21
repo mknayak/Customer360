@@ -171,6 +171,11 @@ class EventWarehouse:
             if metric == "average_time_on_page":
                 row = self.connection.execute("SELECT COALESCE(AVG(duration_seconds), 0) AS value FROM curated_content_activity WHERE event_type = 'TimeOnPage'").fetchone()
                 return {"metric": metric, "value": round(row["value"], 2), "unit": "seconds", "source": "curated_content_activity"}
+            if metric == "page_dropoff":
+                rows = self.connection.execute(
+                    "SELECT COALESCE(content_id, '(unknown)') AS page, COUNT(*) AS exits FROM curated_content_activity WHERE event_type = 'Exit' GROUP BY page ORDER BY exits DESC, page"
+                ).fetchall()
+                return {"metric": metric, "value": [{"page": row["page"], "exits": row["exits"]} for row in rows], "source": "curated_content_activity", "definition": "Exit events grouped by the last page recorded for the session"}
             if metric in {"gross_margin", "profit", "promotion_economics"}:
                 row = self.connection.execute("SELECT COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost, COALESCE(SUM(margin), 0) AS margin FROM curated_finance").fetchone()
                 if metric == "gross_margin":
@@ -210,7 +215,7 @@ class EventWarehouse:
         elif event_type in {"PageVisit", "ContentView", "Search", "TimeOnPage", "Exit"}:
             self.connection.execute(
                 "INSERT OR REPLACE INTO curated_content_activity VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (event_id, payload.get("session_id", event.get("correlation_id")), payload.get("customer_id"), payload.get("content_id"), event_type, occurred_at, float(payload.get("duration_seconds", 0) or 0)),
+                (event_id, payload.get("session_id", event.get("correlation_id")), payload.get("customer_id"), payload.get("content_id", payload.get("last_page")), event_type, occurred_at, float(payload.get("duration_seconds", 0) or 0)),
             )
 
     def quality(self) -> dict[str, Any]:
