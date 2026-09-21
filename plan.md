@@ -243,7 +243,7 @@ The phases below extend the local MVP roadmap into the production-capable Enterp
 - [x] Add Event service contract and idempotency tests
 - [x] Add Event service consumer checkpoint and dead-letter tests
 - [ ] Add contract tests for every service-owned publisher
-- [ ] Emit workflow failure and completion events
+- [x] Emit workflow started, failure, and completion events
 
 **Acceptance criteria:** A consumer can recover from delivery failure, replay a bounded time range safely, and reject incompatible event schemas without data loss.
 

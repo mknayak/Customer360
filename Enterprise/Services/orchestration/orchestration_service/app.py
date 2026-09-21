@@ -63,6 +63,7 @@ def start_shopping_journey(payload: ShoppingJourneyCreate) -> WorkflowResult:
     cart_id = None
     running = WorkflowResult(workflow_id=workflow_id, correlation_id=correlation_id, status="running")
     repository.save(running)
+    publish_event("WorkflowStarted", "orchestration", workflow_id, {"workflow_id": workflow_id, "workflow_type": running.workflow_type}, correlation_id)
     try:
         visit = client.post(
             "site",
@@ -115,6 +116,7 @@ def start_shopping_journey(payload: ShoppingJourneyCreate) -> WorkflowResult:
             published_event_ids=published_event_ids,
         )
         repository.save(result)
+        publish_event("WorkflowCompleted", "orchestration", workflow_id, result.model_dump(), correlation_id)
         return result
     except (KeyError, ServiceCallError) as error:
         failed = WorkflowResult(
@@ -127,6 +129,7 @@ def start_shopping_journey(payload: ShoppingJourneyCreate) -> WorkflowResult:
             failure=str(error),
         )
         repository.save(failed)
+        publish_event("WorkflowFailed", "orchestration", workflow_id, failed.model_dump(), correlation_id)
         raise HTTPException(
             status_code=502,
             detail={

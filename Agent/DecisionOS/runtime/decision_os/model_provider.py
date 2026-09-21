@@ -68,7 +68,8 @@ class OpenAICompatibleModelProvider:
         system = "You are a governed enterprise investigator. Use only supplied context. Separate facts from hypotheses and cite evidence IDs. Do not claim causality without comparative evidence."
         prompt = {"question": request.question, "context": request.context, "allowed_tools": request.allowed_tools}
         body = {"model": self.model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": json.dumps(prompt)}], "temperature": 0, "max_tokens": request.max_output_tokens}
-        http_request = Request(f"{self.base_url}/v1/chat/completions", data=json.dumps(body).encode(), headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}, method="POST")
+        api_root = self.base_url if self.base_url.endswith("/v1") else f"{self.base_url}/v1"
+        http_request = Request(f"{api_root}/chat/completions", data=json.dumps(body).encode(), headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}, method="POST")
         with urlopen(http_request, timeout=self.timeout_seconds) as response:
             payload = json.loads(response.read())
         text = payload["choices"][0]["message"]["content"]
