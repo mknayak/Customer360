@@ -53,6 +53,15 @@ class EventWarehouse:
                     order_id TEXT NOT NULL, product_id TEXT NOT NULL, quantity INTEGER NOT NULL,
                     revenue REAL NOT NULL DEFAULT 0, PRIMARY KEY (order_id, product_id)
                 );
+                CREATE TABLE IF NOT EXISTS curated_content_activity (
+                    event_id TEXT PRIMARY KEY, session_id TEXT, customer_id TEXT, content_id TEXT,
+                    event_type TEXT NOT NULL, occurred_at TEXT NOT NULL, duration_seconds REAL NOT NULL DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS curated_finance (
+                    order_id TEXT PRIMARY KEY, customer_id TEXT, site_id TEXT, promotion_id TEXT,
+                    revenue REAL NOT NULL DEFAULT 0, cost REAL NOT NULL DEFAULT 0,
+                    margin REAL NOT NULL DEFAULT 0, occurred_at TEXT NOT NULL
+                );
                 """
             )
 
@@ -152,6 +161,24 @@ class EventWarehouse:
             if metric == "product_performance":
                 rows = self.connection.execute("SELECT product_id, SUM(quantity) AS units, ROUND(SUM(revenue), 2) AS revenue FROM curated_order_items GROUP BY product_id ORDER BY units DESC, revenue DESC").fetchall()
                 return {"metric": metric, "value": [{"product_id": row["product_id"], "units": row["units"], "revenue": row["revenue"]} for row in rows], "source": "curated_order_items"}
+            if metric == "content_views":
+                row = self.connection.execute("SELECT COUNT(*) AS value FROM curated_content_activity WHERE event_type = 'ContentView'").fetchone()
+                return {"metric": metric, "value": row["value"], "source": "curated_content_activity"}
+            if metric == "content_sessions":
+                row = self.connection.execute("SELECT COUNT(DISTINCT session_id) AS value FROM curated_content_activity WHERE event_type = 'PageVisit'").fetchone()
+                return {"metric": metric, "value": row["value"], "source": "curated_content_activity"}
+            if metric == "average_time_on_page":
+                row = self.connection.execute("SELECT COALESCE(AVG(duration_seconds), 0) AS value FROM curated_content_activity WHERE event_type = 'TimeOnPage'").fetchone()
+                return {"metric": metric, "value": round(row["value"], 2), "unit": "seconds", "source": "curated_content_activity"}
+            if metric in {"gross_margin", "profit", "promotion_economics"}:
+                row = self.connection.execute("SELECT COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost, COALESCE(SUM(margin), 0) AS margin FROM curated_finance").fetchone()
+                if metric == "gross_margin":
+                    value = round(row["margin"] / row["revenue"], 4) if row["revenue"] else 0
+                elif metric == "profit":
+                    value = round(row["margin"], 2)
+                else:
+                    value = {"revenue": round(row["revenue"], 2), "cost": round(row["cost"], 2), "margin": round(row["margin"], 2)}
+                return {"metric": metric, "value": value, "source": "curated_finance", "limitations": ("Cost values default to zero when order payloads do not provide cost_amount.",) if row["cost"] == 0 else ()}
         raise ValueError(f"Unsupported KPI: {metric}")
 
     def _curate(self, event: Mapping[str, Any], event_id: str) -> None:
@@ -174,6 +201,22 @@ class EventWarehouse:
                 quantity = int(item.get("quantity", 0))
                 revenue = quantity * float(item.get("unit_price", 0)) - float(item.get("discount_amount", 0))
                 self.connection.execute("INSERT OR REPLACE INTO curated_order_items VALUES (?, ?, ?, ?)", (order_id, item["product_id"], quantity, revenue))
+            cost = float(payload.get("cost_amount", 0) or 0)
+            self.connection.execute(
+                "INSERT OR REPLACE INTO curated_finance VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (order_id, payload.get("customer_id"), payload.get("site_id"), payload.get("promotion_id"), float(total), cost, float(total) - cost, occurred_at),
+            )
+        elif event_type in {"PageVisit", "ContentView", "Search", "TimeOnPage", "Exit"}:
+            self.connection.execute(
+                "INSERT OR REPLACE INTO curated_content_activity VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (event_id, payload.get("session_id", event.get("correlation_id")), payload.get("customer_id"), payload.get("content_id"), event_type, occurred_at, float(payload.get("duration_seconds", 0) or 0)),
+            )
+
+    def quality(self) -> dict[str, Any]:
+        with self.lock:
+            raw_count = self.connection.execute("SELECT COUNT(*) AS value FROM raw_events").fetchone()["value"]
+            latest = self.connection.execute("SELECT MAX(occurred_at) AS value FROM raw_events").fetchone()["value"]
+            return {"raw_events": raw_count, "latest_occurred_at": latest, "curated_tables": {"visits": self.connection.execute("SELECT COUNT(*) AS value FROM curated_visits").fetchone()["value"], "content_activity": self.connection.execute("SELECT COUNT(*) AS value FROM curated_content_activity").fetchone()["value"], "finance": self.connection.execute("SELECT COUNT(*) AS value FROM curated_finance").fetchone()["value"]}}
 
     @staticmethod
     def _event_id(event: Mapping[str, Any]) -> str:

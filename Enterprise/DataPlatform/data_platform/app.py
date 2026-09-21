@@ -43,3 +43,8 @@ def get_kpi(metric: str) -> dict[str, Any]:
         return warehouse.kpi(metric)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/api/quality")
+def data_quality() -> dict[str, Any]:
+    return warehouse.quality()

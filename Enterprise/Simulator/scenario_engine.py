@@ -10,6 +10,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
+try:
+    from .scenario_ingest import ScenarioIngestor
+except ImportError:
+    from scenario_ingest import ScenarioIngestor
+
 
 SCENARIOS = ("normal", "promotion_uplift", "website_degradation", "product_surge", "feedback_spike")
 
@@ -149,8 +154,19 @@ class ScenarioGenerator:
             events.append({"event_type": "PaymentFailed", "aggregate_type": "order", "aggregate_id": journey_id, "source_service": "shopping"})
         if scenario == "feedback_spike":
             events.append({"event_type": "FeedbackSubmitted", "aggregate_type": "feedback", "aggregate_id": journey_id, "source_service": "feedback"})
-        for event in events:
-            event.update({"correlation_id": journey_id, "customer_id": customer_id, "site_id": site_id, "occurred_at": occurred_at.isoformat()})
+        previous_event_id = None
+        for index, event in enumerate(events, start=1):
+            event_id = f"{journey_id}-event-{index:02d}"
+            event.update({
+                "event_id": event_id,
+                "correlation_id": journey_id,
+                "causation_id": previous_event_id,
+                "payload": {"customer_id": customer_id, "site_id": site_id, "journey_id": journey_id},
+                "occurred_at": occurred_at.isoformat(),
+                "schema_version": 1,
+                "idempotency_key": event_id,
+            })
+            previous_event_id = event_id
         return events
 
 
@@ -163,11 +179,20 @@ def main() -> None:
     parser.add_argument("--products", type=int, default=100)
     parser.add_argument("--sites", type=int, default=5)
     parser.add_argument("--journeys", type=int, default=10_000)
+    parser.add_argument("--ingest", action="store_true", help="push the generated dataset to local enterprise APIs")
+    parser.add_argument("--crm-origin", default="http://127.0.0.1:8001")
+    parser.add_argument("--product-origin", default="http://127.0.0.1:8002")
+    parser.add_argument("--site-origin", default="http://127.0.0.1:8004")
+    parser.add_argument("--events-origin", default="http://127.0.0.1:8007")
     args = parser.parse_args()
     config = ScenarioConfig(args.seed, args.scenario, args.customers, args.products, args.sites, args.journeys)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(ScenarioGenerator(config).dataset(), indent=2), encoding="utf-8")
-    print(json.dumps({"output": str(args.output), "scenario": args.scenario, "seed": args.seed, "customers": args.customers, "products": args.products, "sites": args.sites, "journeys": args.journeys}))
+    dataset = ScenarioGenerator(config).dataset()
+    args.output.write_text(json.dumps(dataset, indent=2), encoding="utf-8")
+    result = {"output": str(args.output), "scenario": args.scenario, "seed": args.seed, "customers": args.customers, "products": args.products, "sites": args.sites, "journeys": args.journeys}
+    if args.ingest:
+        result["ingested"] = ScenarioIngestor({"crm": args.crm_origin, "product": args.product_origin, "site": args.site_origin, "events": args.events_origin}).ingest(dataset)
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":

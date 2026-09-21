@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Northstar Journal</title>
+  <link rel="stylesheet" href="content.css">
+</head>
+<body>
+  <header class="masthead">
+    <a class="wordmark" href="/content.html">Northstar <span>Journal</span></a>
+    <nav aria-label="Content site navigation">
+      <a href="#about">About</a>
+      <a href="#products">Products</a>
+      <a href="#news">News</a>
+      <a href="#blog">Blog</a>
+      <a href="#stories">Customer stories</a>
+      <a href="#sustainability">Sustainability</a>
+      <a href="/">Simulator</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="about" data-content-id="about-northstar" data-content-title="About Northstar">
+      <p class="kicker">Field notes / 01</p>
+      <h1>Objects for a slower, sharper everyday.</h1>
+      <p class="hero-copy">Northstar makes considered tools for kitchens, desks, and the rituals that happen around them.</p>
+      <a class="text-link" href="#stories" data-content-link="customer-stories">Read the field notes <span>-></span></a>
+    </section>
+
+    <section class="feature-grid" id="products">
+      <article class="story-card" data-content-id="orbit-kettle" data-content-title="The Orbit Kettle">
+        <p class="kicker">Product note</p>
+        <h2>The Orbit Kettle</h2>
+        <p>A precise pour, a quiet morning, and a form that earns its place on the counter.</p>
+        <button class="text-link content-action" type="button">Open product note <span>+</span></button>
+      </article>
+      <article class="story-card dark" data-content-id="field-mug" data-content-title="The Field Mug">
+        <p class="kicker">Product note</p>
+        <h2>The Field Mug</h2>
+        <p>Stoneware built for the commute, the studio, and the last warm drink of the day.</p>
+        <button class="text-link content-action" type="button">Open product note <span>+</span></button>
+      </article>
+    </section>
+
+    <section class="journal" id="stories">
+      <div>
+        <p class="kicker">Customer stories</p>
+        <h2>Useful things, in use.</h2>
+      </div>
+      <div class="journal-copy" data-content-id="customer-stories" data-content-title="Customer stories">
+        <p>We visit kitchens, studios, and small spaces to learn what makes an object stay useful after the first impression.</p>
+        <button class="text-link content-action" type="button">Read the latest story <span>+</span></button>
+      </div>
+    </section>
+
+    <section class="feature-grid" aria-label="News and blog">
+      <article class="story-card" id="news" data-content-id="news" data-content-title="Northstar news">
+        <p class="kicker">News</p>
+        <h2>Small changes, shared openly.</h2>
+        <p>Read updates from the workshop, new releases, and the people who keep Northstar moving.</p>
+        <button class="text-link content-action" type="button">Open news <span>+</span></button>
+      </article>
+      <article class="story-card dark" id="blog" data-content-id="blog" data-content-title="Northstar blog">
+        <p class="kicker">Blog</p>
+        <h2>Notes on making useful things.</h2>
+        <p>Essays on materials, maintenance, design, and the rituals that give objects their meaning.</p>
+        <button class="text-link content-action" type="button">Read the blog <span>+</span></button>
+      </article>
+    </section>
+
+    <section class="sustainability" id="sustainability" data-content-id="sustainability" data-content-title="Sustainability at Northstar">
+      <p class="kicker">Sustainability</p>
+      <h2>Make less. Keep longer.</h2>
+      <p>Repairable parts, durable materials, and a clear account of where our products come from.</p>
+    </section>
+
+    <section class="journal" id="company-information">
+      <div>
+        <p class="kicker">Company information</p>
+        <h2>Independent by design.</h2>
+      </div>
+      <div class="journal-copy" data-content-id="company-information" data-content-title="Company information">
+        <p>Northstar is an independent studio working across product design, retail, and repair from our workshop in London.</p>
+        <button class="text-link content-action" type="button">About the company <span>+</span></button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="content-dialog">
+    <button class="dialog-close" type="button" aria-label="Close product note">Close</button>
+    <p class="kicker">Northstar note</p>
+    <h2 id="dialog-title">Content note</h2>
+    <p id="dialog-copy"></p>
+  </dialog>
+  <footer><span>Northstar Journal / Content simulation</span><span id="activity-status">Recording activity...</span></footer>
+  <script src="content.js"></script>
+</body>
+</html>

@@ -49,6 +49,119 @@ async function recordEvent(sourceService, eventType, aggregateType, aggregateId,
   });
 }
 
+const contentPages = {
+  about: 'About Northstar',
+  products: 'Products',
+  news: 'News',
+  blog: 'Blog',
+  stories: 'Customer stories',
+  sustainability: 'Sustainability',
+  'company-information': 'Company information',
+};
+
+function renderUserVisitCustomers() {
+  const select = document.querySelector('#user-visit-customer');
+  if (!select) return;
+  select.innerHTML = '<option value="">Anonymous visitor</option>' + loadedCustomers.map((customer) => `<option value="${customer.customer_id}">${customer.first_name} ${customer.last_name} · ${customer.email}</option>`).join('');
+  if (currentCustomerId) select.value = currentCustomerId;
+}
+
+function selectedUserVisitPages() {
+  return [...document.querySelector('#user-visit-page-selection').selectedOptions].map((option) => option.value).filter((page) => contentPages[page]);
+}
+
+function randomBetween(minimum, maximum) {
+  return minimum + Math.floor(Math.random() * (maximum - minimum + 1));
+}
+
+function chooseUserVisitFlow(selectedFlow) {
+  if (selectedFlow !== 'random') return selectedFlow;
+  return randomItem(['anonymous_browse', 'anonymous_login_browse', 'product_cart_abandon', 'checkout_success', 'checkout_failed']);
+}
+
+function knownUserForVisit(selectedCustomerId) {
+  if (selectedCustomerId) return selectedCustomerId;
+  return loadedCustomers.length ? randomItem(loadedCustomers).customer_id : null;
+}
+
+async function simulateCommerceStep(flow, sessionId, customerId, summary) {
+  const product = catalog[0];
+  if (!customerId || !product || !activeSite) return;
+  await recordEvent('content-site', 'ProductViewed', 'product', product.product_id, { customer_id: customerId, session_id: sessionId, product_id: product.product_id, title: product.name }, sessionId);
+  summary.productViews += 1;
+  const cart = await api('shopping', '/api/carts', { method: 'POST', body: JSON.stringify({ customer_id: customerId, site_id: activeSite.site_id, store_id: storeSelect.value, delivery_mode: deliverySelect.value }) });
+  await api('shopping', `/api/carts/${cart.cart_id}/items`, { method: 'POST', body: JSON.stringify({ product_id: product.product_id, quantity: 1, unit_price: product.price_amount }) });
+  summary.carts += 1;
+  await recordEvent('content-site', 'CartCreated', 'cart', cart.cart_id, { customer_id: customerId, session_id: sessionId, product_id: product.product_id }, sessionId);
+  if (flow === 'product_cart_abandon') {
+    await api('shopping', `/api/carts/${cart.cart_id}`, { method: 'PUT', body: JSON.stringify({ status: 'abandoned' }) });
+    summary.abandoned += 1;
+    return;
+  }
+  await recordEvent('content-site', 'CheckoutStarted', 'cart', cart.cart_id, { customer_id: customerId, session_id: sessionId, cart_id: cart.cart_id }, sessionId);
+  summary.checkouts += 1;
+  const payment = flow === 'checkout_failed'
+    ? { payment_status: 'failed', payment_method: 'card', failure_reason: 'simulated_decline' }
+    : { payment_status: 'succeeded', payment_method: 'card', transaction_id: `txn-${crypto.randomUUID()}` };
+  const order = await api('shopping', '/api/orders', { method: 'POST', body: JSON.stringify({ customer_id: customerId, site_id: activeSite.site_id, store_id: storeSelect.value, delivery_mode: deliverySelect.value, currency: product.currency || 'USD', items: [{ product_id: product.product_id, quantity: 1, unit_price: product.price_amount }], ...payment }) });
+  await recordEvent('content-site', flow === 'checkout_failed' ? 'PaymentFailed' : 'OrderCreated', 'order', order.order_id, { customer_id: customerId, session_id: sessionId, order_id: order.order_id, payment_status: order.payment_status }, sessionId);
+  if (flow === 'checkout_failed') summary.paymentFailures += 1;
+  else summary.orders += 1;
+}
+
+async function simulateUserVisits() {
+  const button = document.querySelector('#simulate-user-visits');
+  const feedback = document.querySelector('#user-visits-feedback');
+  const selectedFlow = document.querySelector('#user-visit-flow').value;
+  const selectedPages = selectedUserVisitPages();
+  const count = Math.min(250, Math.max(1, Number(document.querySelector('#user-visit-count').value) || 1));
+  const pagesPerSession = Math.min(selectedPages.length, Math.max(1, Number(document.querySelector('#user-visit-pages').value) || 1));
+  const dwellSeconds = Math.min(300, Math.max(1, Number(document.querySelector('#user-visit-dwell').value) || 1));
+  const searchRate = Math.min(100, Math.max(0, Number(document.querySelector('#user-visit-search-rate').value) || 0));
+  const contentRate = Math.min(100, Math.max(0, Number(document.querySelector('#user-visit-content-rate').value) || 0));
+  const customerId = document.querySelector('#user-visit-customer').value || null;
+  if (!selectedPages.length) throw new Error('Select at least one page.');
+  const summary = { pageVisits: 0, contentViews: 0, searches: 0, timeOnPage: 0, exits: 0, logins: 0, productViews: 0, carts: 0, abandoned: 0, checkouts: 0, orders: 0, paymentFailures: 0 };
+  button.disabled = true;
+  document.querySelector('#user-visits-state').textContent = 'Running';
+  feedback.textContent = `Starting ${count} user visits across ${selectedPages.length} selected pages...`;
+  try {
+    for (let index = 0; index < count; index += 1) {
+      const sessionId = crypto.randomUUID();
+      const flow = chooseUserVisitFlow(selectedFlow);
+      const loginFlow = flow !== 'anonymous_browse';
+      const knownCustomerId = loginFlow ? knownUserForVisit(customerId) : null;
+      const pages = [...selectedPages].sort(() => Math.random() - 0.5).slice(0, pagesPerSession);
+      await recordEvent('content-site', 'PageVisit', 'content_session', sessionId, { customer_id: null, session_id: sessionId, flow, path: '/content.html' }, sessionId);
+      summary.pageVisits += 1;
+      if (loginFlow && knownCustomerId) {
+        await recordEvent('content-site', 'UserLogin', 'user_session', sessionId, { customer_id: knownCustomerId, session_id: sessionId, method: 'simulated_login' }, sessionId);
+        summary.logins += 1;
+      }
+      for (const page of pages) {
+        const pageId = `${sessionId}:${page}`;
+        if (Math.random() * 100 < contentRate) {
+          await recordEvent('content-site', 'ContentView', 'content_page', pageId, { customer_id: knownCustomerId, session_id: sessionId, content_id: page, title: contentPages[page], path: `/content.html#${page}` }, sessionId);
+          summary.contentViews += 1;
+        }
+        if (Math.random() * 100 < searchRate) {
+          await recordEvent('content-site', 'Search', 'content_session', sessionId, { customer_id: knownCustomerId, session_id: sessionId, query: contentPages[page].toLowerCase(), path: '/content.html' }, sessionId);
+          summary.searches += 1;
+        }
+        await recordEvent('content-site', 'TimeOnPage', 'content_page', pageId, { customer_id: knownCustomerId, session_id: sessionId, content_id: page, duration_seconds: randomBetween(Math.max(1, Math.floor(dwellSeconds / 2)), dwellSeconds) }, sessionId);
+        summary.timeOnPage += 1;
+      }
+      if (['product_cart_abandon', 'checkout_success', 'checkout_failed'].includes(flow)) await simulateCommerceStep(flow, sessionId, knownCustomerId, summary);
+      await recordEvent('content-site', 'Exit', 'content_session', sessionId, { customer_id: knownCustomerId, session_id: sessionId, flow, last_page: pages[pages.length - 1], page_count: pages.length }, sessionId);
+      summary.exits += 1;
+      feedback.textContent = `Simulated ${index + 1} of ${count} user visits...`;
+    }
+    document.querySelector('#user-visits-state').textContent = `${count} sessions`;
+    feedback.textContent = `Created ${count} sessions · ${summary.logins} logins · ${summary.productViews} products · ${summary.carts} carts · ${summary.abandoned} abandoned · ${summary.checkouts} checkouts · ${summary.orders} orders · ${summary.paymentFailures} payment failures.`;
+  } finally {
+    button.disabled = false;
+  }
+}
 function renderSteps() {
   stepsElement.innerHTML = steps.map((step, index) => `<div class="step ${index <= currentStep ? 'done' : ''}"><span class="step-index">${index <= currentStep ? '✓' : String(index + 1).padStart(2, '0')}</span><span>${step}</span></div>`).join('');
 }
@@ -128,6 +241,7 @@ async function loadJourneyData() {
     const result = await api('crm', '/api/customers?page=1&page_size=100');
     loadedCustomers = result.items;
     renderJourneyCustomers();
+    renderUserVisitCustomers();
     const store = await seedCatalog();
     const stores = await api('product', '/api/stores');
     storeSelect.innerHTML = stores.map((item) => `<option value="${item.store_id}">${item.name} · ${item.city || item.channel}</option>`).join('');
@@ -344,6 +458,7 @@ function initializeLeftSidebarGroups() {
     catalog: { kicker: 'Product import', title: 'Load catalog', nodes: [document.querySelector('#catalog-view .customer-import')] },
     sites: { kicker: 'Site view', title: 'Session stats', widget: renderSitesSidebar },
     engagement: { kicker: 'Marketing import', title: 'Load campaigns', nodes: [document.querySelector('#engagement-view > .customer-import')] },
+    'user-visits': { kicker: 'Content simulation', title: 'User visits', widget: () => `<div class="stat-grid"><div class="stat-card"><span>Available pages</span><strong>${Object.keys(contentPages).length}</strong></div><div class="stat-card"><span>Event source</span><strong>content-site</strong></div></div><p class="table-summary">Use the main panel to generate correlated content sessions.</p>` },
     events: { kicker: 'Event backbone', title: 'Stream stats', widget: renderEventsSidebar },
   };
 }
@@ -655,6 +770,7 @@ document.querySelector('#simulate-marketing-touch').addEventListener('click', ()
 document.querySelector('#submit-feedback').addEventListener('click', () => submitFeedback().catch((error) => { document.querySelector('#feedback-flow-feedback').textContent = error.message; }));
 document.querySelector('#simulate-feedback').addEventListener('click', () => simulateFeedback().catch((error) => { document.querySelector('#feedback-flow-feedback').textContent = error.message; }));
 document.querySelector('#simulate-engagement-batch').addEventListener('click', () => simulateEngagementBatch().catch((error) => { document.querySelector('#marketing-flow-feedback').textContent = error.message; }));
+document.querySelector('#simulate-user-visits').addEventListener('click', () => simulateUserVisits().catch((error) => { document.querySelector('#user-visits-feedback').textContent = error.message; }));
 document.querySelector('#refresh-engagement').addEventListener('click', () => loadEngagementData().catch((error) => { document.querySelector('#engagement-feedback').textContent = error.message; }));
 document.querySelector('#refresh-sites').addEventListener('click', () => loadSiteData().catch((error) => { document.querySelector('#sites-feedback').textContent = error.message; }));
 document.querySelector('#sites-customer-filter').addEventListener('change', () => loadSiteData().catch((error) => { document.querySelector('#sites-feedback').textContent = error.message; }));

@@ -9,7 +9,7 @@
 <body>
   <main class="shell">
     <header class="topbar"><div class="brand"><span class="brand-mark">N</span><span>Northstar</span></div><span class="environment"><span class="pulse"></span>Local simulation</span></header>
-    <nav class="tabs" aria-label="Simulator views"><button class="tab active" data-tab="journey">Shopping journey</button><button class="tab" data-tab="orders">Carts / orders</button><button class="tab" data-tab="customers">Customers</button><button class="tab" data-tab="catalog">Product / store data</button><button class="tab" data-tab="sites">Sites</button><button class="tab" data-tab="engagement">Marketing / feedback</button><button class="tab" data-tab="events">Events</button></nav>
+    <nav class="tabs" aria-label="Simulator views"><button class="tab active" data-tab="journey">Shopping journey</button><button class="tab" data-tab="orders">Carts / orders</button><button class="tab" data-tab="customers">Customers</button><button class="tab" data-tab="catalog">Product / store data</button><button class="tab" data-tab="sites">Sites</button><button class="tab" data-tab="user-visits">User visits</button><button class="tab" data-tab="engagement">Marketing / feedback</button><button class="tab" data-tab="events">Events</button><a class="tab" href="/content.html">Content site</a></nav>
     <aside id="left-sidebar" class="left-panel"><div class="side-header"><p class="eyebrow" id="left-sidebar-kicker">Simulator</p><h3 id="left-sidebar-title">Actions</h3></div><div id="left-sidebar-body" class="side-body"></div></aside>
     <aside id="record-detail-panel" class="detail-panel" hidden><div class="detail-header"><div><p class="eyebrow" id="record-detail-type">Record details</p><h3 id="record-detail-title">Select a row</h3></div><button id="close-record-detail" class="page-button">Close</button></div><div id="record-detail-body" class="detail-body"><p class="table-message">Click a table row to inspect details.</p></div></aside>
     <section id="journey-view" class="view active-view">
@@ -58,6 +58,25 @@
       <div class="table-wrap"><table><thead><tr><th>Site</th><th>Type</th><th>City</th><th>Status</th><th>Visits</th></tr></thead><tbody id="site-table-body"><tr><td colspan="5" class="table-message">Click Refresh to load site data.</td></tr></tbody></table></div>
       <div class="table-wrap stacked-table"><table><thead><tr><th>Visit</th><th>Customer</th><th>Site</th><th>Channel</th><th>Started</th><th>Ended</th></tr></thead><tbody id="visit-table-body"><tr><td colspan="6" class="table-message">Click Refresh to load visits.</td></tr></tbody></table></div>
       <p id="sites-feedback" class="feedback" role="status">Site service must be running on port 8004.</p>
+    </section>
+    <section id="user-visits-view" class="view customer-view" hidden>
+      <div class="customer-heading"><div><p class="eyebrow">Content / User behavior</p><h2>Simulate user visits</h2><p class="lede">Generate correlated content journeys across multiple pages and emit page, search, dwell-time, content-view, and exit events.</p></div><span id="user-visits-state" class="state">Ready</span></div>
+      <section class="engagement-grid user-visit-grid" aria-label="User visit simulation controls">
+        <div class="journey-panel">
+          <div class="panel-heading"><div><p class="eyebrow">Session generator</p><h2>Visit pattern</h2></div></div>
+          <label class="control">Flow<select id="user-visit-flow"><option value="random" selected>Random mix</option><option value="anonymous_browse">Anonymous browse and exit</option><option value="anonymous_login_browse">Anonymous → login → known browsing</option><option value="product_cart_abandon">Anonymous → login → product → cart abandon</option><option value="checkout_success">Anonymous → login → product → cart → checkout success</option><option value="checkout_failed">Anonymous → login → product → cart → payment failed</option></select></label>
+          <label class="control">Customer<select id="user-visit-customer"><option value="">Anonymous visitor</option></select></label>
+          <label class="control">Sessions to simulate<input id="user-visit-count" type="number" min="1" max="250" value="10"></label>
+          <label class="control">Pages per session<input id="user-visit-pages" type="number" min="1" max="7" value="3"></label>
+          <label class="control">Dwell time, seconds<input id="user-visit-dwell" type="number" min="1" max="300" value="30"></label>
+          <label class="control">Search probability, %<input id="user-visit-search-rate" type="number" min="0" max="100" value="25"></label>
+          <label class="control">Content view probability, %<input id="user-visit-content-rate" type="number" min="0" max="100" value="80"></label>
+          <label class="control">Pages<select id="user-visit-page-selection" multiple size="7"><option value="about" selected>About Northstar</option><option value="products" selected>Products</option><option value="news">News</option><option value="blog">Blog</option><option value="stories">Customer stories</option><option value="sustainability">Sustainability</option><option value="company-information">Company information</option></select></label>
+          <button id="simulate-user-visits" class="primary">Simulate user visits <span>→</span></button>
+          <p id="user-visits-feedback" class="feedback" role="status">Choose pages and generate correlated content sessions.</p>
+        </div>
+        <div class="journey-panel"><div class="panel-heading"><div><p class="eyebrow">Event sequence</p><h2>Signals emitted</h2></div></div><div class="steps"><div class="step done"><span class="step-index">1</span><span>Anonymous PageVisit</span></div><div class="step done"><span class="step-index">2</span><span>Optional UserLogin</span></div><div class="step done"><span class="step-index">3</span><span>Pages, searches, content views</span></div><div class="step done"><span class="step-index">4</span><span>Optional product, cart, checkout</span></div><div class="step done"><span class="step-index">5</span><span>Exit with flow outcome</span></div></div><p class="table-summary">Every session receives one correlation ID. Filter the Events tab by that ID to inspect the full flow.</p></div>
+      </section>
     </section>
     <section id="engagement-view" class="view customer-view" hidden>
       <div class="customer-heading"><div><p class="eyebrow">Marketing / Feedback</p><h2>Simulate customer engagement</h2><p class="lede">Import campaign definitions, record campaign touches, and submit customer feedback tied to the same customer and campaign IDs.</p></div><span id="engagement-state" class="state">Not loaded</span></div>

@@ -12,6 +12,7 @@ def test_scenario_generation_is_deterministic_and_meets_scale_floor():
     assert len(first["sites"]) == 5
     assert len(first["journeys"]) == 20
     assert all(event["correlation_id"] == journey["correlation_id"] for journey in first["journeys"] for event in journey["events"])
+    assert all(event["event_id"] and event["schema_version"] == 1 and event["payload"]["customer_id"] == journey["customer_id"] for journey in first["journeys"] for event in journey["events"])
 
 
 def test_scenario_modes_change_behavior():
