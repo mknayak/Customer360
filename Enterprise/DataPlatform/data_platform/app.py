@@ -30,7 +30,9 @@ def ingest_events(batch: EventBatch) -> dict[str, int]:
 @app.post("/api/ingest/event-service")
 def ingest_event_service(origin: str | None = None, limit: int = Query(default=1000, ge=1, le=10_000)) -> dict[str, int]:
     try:
-        return warehouse.ingest_event_service(origin or os.getenv("EVENTS_ORIGIN", "http://127.0.0.1:8007"), limit=limit)
+        event_result = warehouse.ingest_event_service(origin or os.getenv("EVENTS_ORIGIN", "http://127.0.0.1:8007"), limit=limit)
+        order_result = warehouse.backfill_shopping_orders(os.getenv("SHOPPING_ORIGIN", "http://127.0.0.1:8003"))
+        return {"events_received": event_result["received"], "events_stored": event_result["stored"], "orders_received": order_result["received"], "orders_stored": order_result["stored"]}
     except Exception as error:
         raise HTTPException(status_code=502, detail=f"Event ingestion failed: {error}") from error
 

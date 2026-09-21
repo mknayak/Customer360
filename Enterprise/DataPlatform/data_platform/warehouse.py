@@ -90,6 +90,39 @@ class EventWarehouse:
         with urlopen(f"{origin.rstrip('/')}/api/events?{query}", timeout=10) as response:
             return self.ingest(json.loads(response.read()))
 
+    def backfill_shopping_orders(self, origin: str, *, page_size: int = 100) -> dict[str, int]:
+        """Backfill item-level facts when older events predate item payloads."""
+        page = 1
+        received = 0
+        stored = 0
+        while True:
+            query = urlencode({"page": page, "page_size": page_size})
+            with urlopen(f"{origin.rstrip('/')}/api/orders?{query}", timeout=10) as response:
+                result = json.loads(response.read())
+            orders = result.get("items", [])
+            if not orders:
+                break
+            events = [
+                {
+                    "event_id": f"shopping-order-backfill:{order['order_id']}",
+                    "source_service": "shopping",
+                    "event_type": "OrderCreated",
+                    "aggregate_type": "order",
+                    "aggregate_id": order["order_id"],
+                    "payload": order,
+                    "occurred_at": order.get("created_at", ""),
+                    "correlation_id": None,
+                }
+                for order in orders
+            ]
+            ingest_result = self.ingest(events)
+            received += ingest_result["received"]
+            stored += ingest_result["stored"]
+            if page >= result.get("total_pages", page) or len(orders) < page_size:
+                break
+            page += 1
+        return {"received": received, "stored": stored}
+
     def kpi(self, metric: str) -> dict[str, Any]:
         with self.lock:
             if metric == "revenue":
@@ -106,8 +139,18 @@ class EventWarehouse:
                 carts = self.connection.execute("SELECT COUNT(*) AS value FROM curated_carts").fetchone()["value"]
                 abandoned = self.connection.execute("SELECT COUNT(*) AS value FROM curated_carts WHERE abandoned = 1").fetchone()["value"]
                 return {"metric": metric, "value": round(abandoned / carts, 4) if carts else 0, "numerator": abandoned, "denominator": carts, "source": "curated_carts"}
+            if metric == "retention":
+                customers = self.connection.execute(
+                    "SELECT COUNT(DISTINCT customer_id) AS value FROM curated_orders WHERE payment_status = 'succeeded' AND customer_id IS NOT NULL"
+                ).fetchone()["value"]
+                repeat_customers = self.connection.execute(
+                    "SELECT COUNT(*) AS value FROM (SELECT customer_id FROM curated_orders WHERE payment_status = 'succeeded' AND customer_id IS NOT NULL GROUP BY customer_id HAVING COUNT(*) > 1)"
+                ).fetchone()["value"]
+                return {"metric": metric, "value": round(repeat_customers / customers, 4) if customers else 0, "numerator": repeat_customers, "denominator": customers, "source": "curated_orders"}
+            if metric == "segment_conversion":
+                return {"metric": metric, "value": [], "source": "curated_customer_segments", "limitations": ("No customer segment assignments have been ingested",)}
             if metric == "product_performance":
-                rows = self.connection.execute("SELECT product_id, SUM(quantity) AS units, ROUND(SUM(revenue), 2) AS revenue FROM curated_order_items GROUP BY product_id ORDER BY revenue DESC").fetchall()
+                rows = self.connection.execute("SELECT product_id, SUM(quantity) AS units, ROUND(SUM(revenue), 2) AS revenue FROM curated_order_items GROUP BY product_id ORDER BY units DESC, revenue DESC").fetchall()
                 return {"metric": metric, "value": [{"product_id": row["product_id"], "units": row["units"], "revenue": row["revenue"]} for row in rows], "source": "curated_order_items"}
         raise ValueError(f"Unsupported KPI: {metric}")
 
@@ -125,7 +168,8 @@ class EventWarehouse:
         elif event_type == "OrderCreated":
             order_id = event["aggregate_id"]
             total = payload.get("total_amount", payload.get("total", 0)) or 0
-            self.connection.execute("INSERT OR IGNORE INTO curated_orders VALUES (?, ?, ?, ?, ?)", (order_id, payload.get("customer_id"), occurred_at, payload.get("payment_status"), float(total)))
+            self.connection.execute("DELETE FROM curated_order_items WHERE order_id = ?", (order_id,))
+            self.connection.execute("INSERT OR REPLACE INTO curated_orders VALUES (?, ?, ?, ?, ?)", (order_id, payload.get("customer_id"), occurred_at, payload.get("payment_status"), float(total)))
             for item in payload.get("items", []):
                 quantity = int(item.get("quantity", 0))
                 revenue = quantity * float(item.get("unit_price", 0)) - float(item.get("discount_amount", 0))

@@ -1,29 +1,141 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+import json
+import os
+from urllib.error import URLError
+from urllib.request import Request, urlopen
+from pathlib import Path
+from typing import Any, Literal, Mapping
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from Agent.DecisionOS.runtime.decision_os.adapters import ServiceAdapters
+from Agent.DecisionOS.runtime.decision_os.agents import AgentFinding, AgentPack
 from Agent.DecisionOS.runtime.decision_os.engine import InvestigationEngine
-from Agent.DecisionOS.runtime.decision_os.models import PermissionDecision, ToolRequest
+from Agent.DecisionOS.runtime.decision_os.evidence import EvidencePipeline
+from Agent.DecisionOS.runtime.decision_os.models import DecisionBrief, PermissionDecision, ToolRequest
 from Agent.DecisionOS.runtime.decision_os.persistence import InMemoryPersistence
 from Agent.DecisionOS.runtime.decision_os.catalog import register_tool_catalog
-from Agent.DecisionOS.runtime.decision_os.tools import ToolDispatcher
+from Agent.DecisionOS.runtime.decision_os.graph import GraphStore, graph_tool_handlers
+from Agent.DecisionOS.runtime.decision_os.rag import Document, DocumentStore, GraphRAGRetriever, rag_tool_handlers
+from Agent.DecisionOS.runtime.decision_os.semantic import SemanticRegistry
+from Agent.DecisionOS.runtime.decision_os.tools import PermissionMap, ToolExecution, ToolDispatcher
 
 
 def allow_all(principal_id: str, resource: str) -> PermissionDecision:
     return PermissionDecision(True, principal_id, resource, "allowed")
 
 
+PERMISSIONS = PermissionMap(
+    {
+        "cfo-1": {"analytics", "semantic", "graph", "rag", "governance", "customer", "product", "order", "visit", "campaign", "feedback"},
+        "executive-1": {"analytics", "semantic", "graph", "rag", "governance"},
+    }
+)
+
+
 def analytics_metric_handler(inputs: Mapping[str, Any]):
     metric = inputs.get("metric", "revenue")
-    value = inputs.get("value", 0)
-    return {"metric": metric, "value": value, "status": "resolved"}
+    fallback = inputs.get("value", 0)
+    origin = os.getenv("DATA_PLATFORM_ORIGIN", "http://127.0.0.1:8010")
+    try:
+        ingest_request = Request(f"{origin.rstrip('/')}/api/ingest/event-service", data=b"", method="POST")
+        with urlopen(ingest_request, timeout=5):
+            pass
+        with urlopen(f"{origin.rstrip('/')}/api/kpis/{metric}", timeout=5) as response:
+            result = json.loads(response.read())
+        return ToolExecution(
+            data={**result, "status": "resolved"},
+            source=(f"data-platform:/api/kpis/{metric}",),
+            query_metadata={"tool": "analytics.query", "metric": metric, "live": True},
+            freshness={"retrieved_at": "live"},
+            evidence_references=(f"analytics:{metric}",),
+        )
+    except (URLError, OSError, json.JSONDecodeError):
+        return ToolExecution(
+            data={"metric": metric, "value": fallback, "status": "fallback"},
+            source=("analytics.query",),
+            query_metadata={"tool": "analytics.query", "metric": metric, "live": False},
+            warnings=("Live Data Platform unavailable; deterministic fallback used",),
+            evidence_references=(f"analytics-fallback:{metric}",),
+        )
 
 
+def resolve_metric(prompt: str) -> tuple[str, str, str]:
+    """Map question language to an approved Data Platform KPI."""
+    normalized = prompt.casefold()
+    if ("segment" in normalized or "segments" in normalized) and any(
+        keyword in normalized for keyword in ("convert", "conversion", "customer")
+    ):
+        return "segment_conversion", "Segment conversion", "results"
+    candidates = (
+        ("product_performance", "Product performance", "results"),
+        ("cart_abandonment", "Cart abandonment", "%"),
+        ("conversion", "Conversion rate", "%"),
+        ("visits", "Visits", "visits"),
+        ("retention", "Customer retention", "%"),
+        ("revenue", "Revenue", "USD"),
+    )
+    keywords = {
+        "product_performance": ("product", "sku", "units", "sell-through", "underperform"),
+        "cart_abandonment": ("abandon", "cart"),
+        "conversion": ("conversion", "funnel"),
+        "visits": ("visit", "traffic", "session"),
+        "retention": ("retention", "churn", "repeat customer", "repeat purchase"),
+        "revenue": ("revenue", "sales", "margin", "profit", "kpi"),
+    }
+    for metric, label, unit in candidates:
+        if any(keyword in normalized for keyword in keywords[metric]):
+            return metric, label, unit
+    return "revenue", "Revenue", "USD"
+
+
+def format_metric_answer(metric: str, label: str, value: Any, unit: str) -> tuple[str, list[str], list[str]]:
+    if metric == "segment_conversion":
+        if not value:
+            return (
+                "Segment conversion cannot be calculated because no customer segment assignments are available.",
+                ["CRM currently contains no segment memberships for customers."],
+                ["Which customer segments should be assigned first?", "Would you like to load the segment assignments before calculating conversion?"],
+            )
+        return (
+            f"Segment conversion returned {len(value)} segments.",
+            [f"{row['segment']}: {row['conversion_rate']:.2%} conversion" for row in value[:5]],
+            ["Which segment should be investigated next?"],
+        )
+    if metric == "product_performance":
+        rows = value if isinstance(value, list) else []
+        top = rows[0] if rows else None
+        def product_name(row: Mapping[str, Any]) -> str:
+            product_id = str(row["product_id"])
+            try:
+                product = service_adapters.product.get(product_id)
+                attributes = product.data.get("attributes", {})
+                return attributes.get("name") or attributes.get("sku") or product_id
+            except Exception:
+                return product_id
+
+        top_name = product_name(top) if top else ""
+        answer = f"Top-selling product by units is {top_name} with {rows[0]['units']} units." if rows else "No product performance records are available after refreshing order history."
+        facts = [f"{product_name(row)}: {row['units']} units and {row['revenue']:.2f} revenue" for row in rows[:3]]
+        follow_ups = ["Which products are underperforming relative to forecast?", "Which category contributes most revenue?"]
+        return answer, facts, follow_ups
+    numeric = float(value or 0)
+    display_value = numeric * 100 if unit == "%" else numeric
+    formatted = f"{display_value:,.2f}" if unit in {"USD", "%"} else f"{display_value:,.0f}"
+    suffix = "%" if unit == "%" else f" {unit}" if unit else ""
+    answer = f"{label} is currently {formatted}{suffix}."
+    facts = [f"{label} resolved to {formatted}{suffix}."]
+    follow_ups = {
+        "revenue": ["Which site or segment contributes most to revenue?", "How does revenue compare with the prior period?"],
+        "visits": ["Which site or channel contributes most visits?", "How does traffic convert to orders?"],
+        "conversion": ["Which funnel step has the largest drop-off?", "How does conversion vary by site?"],
+        "cart_abandonment": ["Which site or channel has the highest abandonment?", "What products are most common in abandoned carts?"],
+        "retention": ["Which customer segment has the strongest retention?", "How does retention vary by period?"],
+    }.get(metric, ["Which segment should be investigated next?"])
+    return answer, facts, follow_ups
 def entity_mapping_handler(inputs: Mapping[str, Any]):
     return service_adapters.entity_mapping(inputs["entity_type"], inputs["entity_id"])
 
@@ -33,13 +145,16 @@ def customer_snapshot_handler(inputs: Mapping[str, Any]):
 
 
 def build_dispatcher() -> ToolDispatcher:
-    dispatcher = ToolDispatcher(allow_all)
+    dispatcher = ToolDispatcher(PERMISSIONS)
     register_tool_catalog(
         dispatcher,
         {
           "customer.snapshot": customer_snapshot_handler,
             "analytics.query": analytics_metric_handler,
+            "semantic.lookup": semantic_registry.lookup_execution,
             "semantic.entity_mapping": entity_mapping_handler,
+            **graph_tool_handlers(graph_store),
+            **rag_tool_handlers(rag_retriever),
         },
     )
     return dispatcher
@@ -58,7 +173,13 @@ service_adapters = ServiceAdapters.from_origins(
         "orchestration": "http://127.0.0.1:8008",
     }
 )
+semantic_registry = SemanticRegistry()
+graph_store = GraphStore()
+document_store = DocumentStore()
+rag_retriever = GraphRAGRetriever(document_store, graph_store)
 engine = InvestigationEngine(InMemoryPersistence(), build_dispatcher())
+agent_pack = AgentPack()
+evidence_pipeline = EvidencePipeline()
 
 
 class InvestigationCreateRequest(BaseModel):
@@ -73,41 +194,55 @@ class ChatRequest(BaseModel):
 
 class ExecutiveBriefRequest(ChatRequest):
     conversation_id: str | None = None
+    executive_role: Literal["CEO", "CFO"] = "CFO"
+
+
+class InvestigationRequest(ChatRequest):
+    time_period: str | None = None
 
 
 conversation_history: dict[str, list[dict[str, str]]] = {}
+TEMPLATE_PATH = Path(__file__).parent / "templates" / "index.html"
 
 
-def build_executive_brief(prompt: str, principal_id: str, conversation_id: str | None = None) -> dict[str, Any]:
+def build_executive_brief(
+    prompt: str,
+    principal_id: str,
+    conversation_id: str | None = None,
+    executive_role: str = "CFO",
+) -> dict[str, Any]:
+    metric, metric_label, metric_unit = resolve_metric(prompt)
     investigation = engine.create(prompt, principal_id)
     prepared = engine.plan(investigation.investigation_id, {"goal": "investigate_prompt", "scope": "executive"})
     tool_request = ToolRequest(
         tool_name="analytics.query",
         principal_id=prepared.principal_id,
-        input={"metric": "revenue", "value": 125000},
+        input={"metric": metric},
     )
     updated = engine.run_tools(investigation.investigation_id, [tool_request])
     engine.begin_validation(investigation.investigation_id)
     result = updated.tool_results[-1]
+    value = result.data.get("value", 0) if isinstance(result.data, Mapping) else 0
+    answer, facts, follow_up_questions = format_metric_answer(metric, metric_label, value, metric_unit)
+    live = result.query_metadata.get("live") is True
+    source_label = result.source[0] if result.source else "analytics.query"
     resolved_conversation_id = conversation_id or investigation.investigation_id
     history = conversation_history.setdefault(resolved_conversation_id, [])
-    history.append({"question": prompt, "answer": "Revenue is currently resolved at $125,000 for the selected investigation scope."})
+    history.append({"question": prompt, "answer": answer})
     return {
       "investigation_id": investigation.investigation_id,
       "conversation_id": resolved_conversation_id,
+    "executive_role": executive_role,
       "status": "validating",
       "question": prompt,
-      "answer": "Revenue is currently resolved at $125,000 for the selected investigation scope.",
-      "facts": ["Revenue resolved to $125,000.", "The result came from the governed analytics query path."],
-      "key_drivers": ["Revenue is the selected KPI for this investigation."],
+        "answer": answer,
+        "facts": facts + ["The result came from the governed analytics query path."],
+            "key_drivers": [f"{metric_label} was selected from the question language."],
       "confidence": "medium",
-      "limitations": ["The current runtime uses a deterministic analytics adapter until live analytical services are connected."],
+    "limitations": [] if live else ["Live Data Platform unavailable; deterministic analytics fallback was used."],
       "recommendations": ["Drill into revenue by site, period, or customer segment before taking action."],
-      "follow_up_questions": [
-        "How does revenue compare with the prior period?",
-        "Which site or segment contributes most to the result?",
-      ],
-        "metrics": [{"label": "Revenue", "value": 125000, "unit": "USD", "trend": 0.0}],
+            "follow_up_questions": follow_up_questions,
+                "metrics": [{"label": metric_label, "value": value, "unit": metric_unit, "trend": 0.0}],
         "evidence": [{
             "id": reference,
             "source": source,
@@ -121,95 +256,7 @@ def build_executive_brief(prompt: str, principal_id: str, conversation_id: str |
 
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
-    return """
-    <!doctype html>
-    <html lang="en">
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Customer360 / Executive Intelligence</title>
-        <style>
-          :root { --ink: #18232b; --muted: #68747b; --paper: #f5f3ee; --panel: #fffdf8; --line: #d8d5cc; --teal: #087f7a; --coral: #d8664b; --shadow: 0 18px 45px rgba(24,35,43,.08); }
-          * { box-sizing: border-box; }
-          body { margin: 0; color: var(--ink); background: var(--paper); font-family: "Avenir Next", "Helvetica Neue", sans-serif; background-image: linear-gradient(115deg, rgba(8,127,122,.06), transparent 35%), linear-gradient(0deg, transparent 96%, rgba(24,35,43,.04) 96%); }
-          header { display: flex; justify-content: space-between; align-items: center; max-width: 1440px; margin: auto; padding: 25px 5vw; border-bottom: 1px solid var(--line); }
-          .brand { letter-spacing: .08em; text-transform: uppercase; font-size: 12px; font-weight: 700; }
-          .brand strong { color: var(--teal); }
-          .status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
-          .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--teal); }
-          main { max-width: 1440px; margin: auto; padding: 48px 5vw 64px; }
-          .intro { display: grid; grid-template-columns: 1.2fr .8fr; gap: 48px; align-items: end; margin-bottom: 36px; }
-          h1, h2, p { margin: 0; }
-          h1 { max-width: 760px; font-family: Georgia, serif; font-size: clamp(38px, 5vw, 72px); line-height: .98; font-weight: 400; letter-spacing: 0; }
-          .lede { color: var(--muted); line-height: 1.65; max-width: 360px; }
-          .question-bar { display: flex; gap: 12px; padding: 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
-          input { min-width: 0; flex: 1; border: 0; background: transparent; padding: 14px; color: var(--ink); font: inherit; outline: 0; }
-          button { border: 0; background: var(--teal); color: white; padding: 0 24px; font: inherit; font-weight: 700; cursor: pointer; }
-          button:hover { background: #066966; }
-          .workspace { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, .8fr); gap: 22px; }
-          .panel { background: var(--panel); border: 1px solid var(--line); padding: 26px; min-height: 180px; }
-          .panel h2 { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 20px; }
-          .answer { grid-row: span 2; min-height: 385px; }
-          .answer-text { font-family: Georgia, serif; font-size: 30px; line-height: 1.2; max-width: 700px; }
-          .facts { display: grid; gap: 12px; margin-top: 30px; }
-          .fact { display: flex; gap: 12px; color: #3d4b50; line-height: 1.45; }
-          .fact::before { content: ""; width: 4px; flex: 0 0 4px; background: var(--coral); }
-          .metric { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding: 4px 0 16px; }
-          .metric-value { font-family: Georgia, serif; font-size: 36px; }
-          .bar { height: 8px; margin-top: 24px; background: #e4e1d8; overflow: hidden; }
-          .bar span { display: block; height: 100%; width: 68%; background: var(--teal); }
-          .list { display: grid; gap: 13px; padding: 0; margin: 0; list-style: none; color: #3d4b50; line-height: 1.45; }
-          .list li { display: flex; gap: 10px; }
-          .list li::before { content: "↳"; color: var(--teal); font-weight: 700; }
-          .evidence { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-          .source { border-left: 3px solid var(--teal); padding-left: 14px; }
-          .source strong { display: block; font-size: 14px; }
-          .source small { display: block; color: var(--muted); margin-top: 5px; }
-          .empty { color: var(--muted); }
-          .loading { opacity: .55; }
-          @media (max-width: 800px) { header { padding: 20px; } main { padding: 34px 20px; } .intro, .workspace { grid-template-columns: 1fr; gap: 24px; } .answer { grid-row: auto; } .evidence { grid-column: auto; grid-template-columns: 1fr; } .question-bar { flex-direction: column; } button { min-height: 48px; } }
-        </style>
-      </head>
-      <body>
-        <header><div class="brand"><strong>Customer360</strong> / executive intelligence</div><div class="status">DecisionOS online</div></header>
-        <main>
-          <section class="intro"><div><h1>Make the next decision with the evidence in view.</h1></div><p class="lede">A governed workspace for questions that cross customers, products, sites, campaigns, and revenue.</p></section>
-          <form class="question-bar" id="question-form"><input id="prompt" autocomplete="off" placeholder="Ask an executive question" aria-label="Executive question"><button type="submit">Investigate</button></form>
-          <section class="workspace" id="workspace" aria-live="polite" style="margin-top:22px">
-            <article class="panel answer"><h2>Decision brief</h2><p class="answer-text empty" id="answer">Your structured brief will appear here.</p><div class="facts" id="facts"></div></article>
-            <article class="panel"><h2>Primary signal</h2><div class="metric"><span id="metric-label">Awaiting query</span><span class="metric-value" id="metric-value">—</span></div><div class="bar"><span id="metric-bar" style="width:0"></span></div></article>
-            <article class="panel"><h2>Next actions</h2><ul class="list" id="recommendations"><li class="empty">Investigate a question to see recommended next actions.</li></ul></article>
-            <article class="panel evidence"><div><h2>Evidence & lineage</h2><div id="evidence-list" class="empty">No evidence retrieved yet.</div></div><div><h2>Follow-up questions</h2><ul class="list" id="follow-ups"><li class="empty">Suggested follow-ups will appear here.</li></ul></div></article>
-          </section>
-        </main>
-        <script>
-          const form = document.getElementById('question-form');
-          const setList = (id, values) => { document.getElementById(id).innerHTML = (values || []).map(value => `<li>${value}</li>`).join('') || '<li class="empty">None recorded.</li>'; };
-          form.addEventListener('submit', async event => {
-            event.preventDefault();
-            const prompt = document.getElementById('prompt').value.trim();
-            if (!prompt) return;
-            document.getElementById('answer').textContent = 'Investigating governed sources…';
-            document.getElementById('answer').classList.add('loading');
-            try {
-              const response = await fetch('/api/executive/brief', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt, principal_id: 'cfo-1'}) });
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.detail || 'Investigation failed');
-              document.getElementById('answer').textContent = data.answer;
-              document.getElementById('answer').classList.remove('empty', 'loading');
-              document.getElementById('metric-label').textContent = data.metrics[0]?.label || 'Signal';
-              document.getElementById('metric-value').textContent = data.metrics[0] ? '$' + data.metrics[0].value.toLocaleString() : '—';
-              document.getElementById('metric-bar').style.width = data.metrics[0] ? '68%' : '0';
-              setList('facts', data.facts);
-              setList('recommendations', data.recommendations);
-              setList('follow-ups', data.follow_up_questions);
-              document.getElementById('evidence-list').innerHTML = data.evidence.map(item => `<div class="source"><strong>${item.id}</strong><small>${item.source} · ${item.query.tool || 'governed query'}</small></div>`).join('') || '<span class="empty">No evidence returned.</span>';
-            } catch (error) { document.getElementById('answer').textContent = error.message; document.getElementById('answer').classList.remove('loading'); }
-          });
-        </script>
-      </body>
-    </html>
-    """
+    return TEMPLATE_PATH.read_text(encoding="utf-8")
 
 
 @app.get("/api/health")
@@ -220,6 +267,65 @@ def health() -> dict[str, str]:
 @app.get("/api/adapters/health")
 def adapter_health():
   return service_adapters.health()
+
+
+@app.post("/api/semantic/lookup")
+def semantic_lookup(payload: dict[str, Any]) -> dict[str, Any]:
+    return semantic_registry.lookup_execution(payload).__dict__
+
+
+@app.post("/api/graph/sync")
+def sync_graph(payload: dict[str, Any]) -> dict[str, Any]:
+    version = graph_store.sync(payload.get("entities", ()), payload.get("relationships", ()))
+    return {"status": "synced", "graph_version": version}
+
+
+@app.get("/api/graph/paths")
+def graph_paths(from_id: str, to_id: str, max_depth: int = 6) -> dict[str, Any]:
+    return graph_store.paths(from_id, to_id, max_depth).__dict__
+
+
+@app.post("/api/rag/documents")
+def ingest_document(payload: dict[str, Any]) -> dict[str, Any]:
+    document = Document(
+        document_id=payload["document_id"],
+        title=payload["title"],
+        content=payload["content"],
+        source=payload["source"],
+        version=payload.get("version", "1"),
+        document_type=payload.get("document_type", "document"),
+        author=payload.get("author", ""),
+        updated_at=payload.get("updated_at", ""),
+        metadata=payload.get("metadata", {}),
+        authorized_principals=tuple(payload.get("authorized_principals", ("*",))),
+        superseded=payload.get("superseded", False),
+    )
+    chunks = document_store.ingest(document)
+    return {"document_id": document.document_id, "chunks": len(chunks), "version": document.version}
+
+
+@app.post("/api/rag/search")
+def search_documents(payload: dict[str, Any]) -> dict[str, Any]:
+    result = rag_retriever.search(
+        payload["query"],
+        payload.get("principal_id", "system"),
+        payload.get("entity_type"),
+        payload.get("entity_id"),
+        payload.get("max_results", 10),
+    )
+    return result.__dict__
+
+
+@app.get("/api/rag/documents/{document_id}")
+def lookup_document(document_id: str, principal_id: str = "system") -> dict[str, Any]:
+    return document_store.document_lookup(document_id, principal_id).__dict__
+
+
+@app.post("/api/rag/policies/search")
+def search_policies(payload: dict[str, Any]) -> dict[str, Any]:
+    return document_store.policy_retrieve(
+        payload["policy"], payload.get("principal_id", "system"), payload.get("max_results", 10)
+    ).__dict__
 
 
 @app.post("/api/investigations")
@@ -235,11 +341,13 @@ def create_investigation(payload: InvestigationCreateRequest):
 @app.post("/api/investigations/{investigation_id}/run")
 def run_investigation(investigation_id: str):
     try:
-        prepared = engine.plan(investigation_id, {"goal": "analyze_kpi", "metric": "revenue"})
+        investigation = engine._load(investigation_id)
+        metric, _, _ = resolve_metric(investigation.question)
+        prepared = engine.plan(investigation_id, {"goal": "analyze_kpi", "metric": metric})
         tool_request = ToolRequest(
             tool_name="analytics.query",
             principal_id=prepared.principal_id,
-            input={"metric": "revenue", "value": 125000},
+            input={"metric": metric},
         )
         updated = engine.run_tools(investigation_id, [tool_request])
         engine.begin_validation(investigation_id)
@@ -257,6 +365,49 @@ def chat(payload: ChatRequest):
   return build_executive_brief(payload.prompt, payload.principal_id)
 
 
+@app.post("/api/agent/investigate")
+def investigate(payload: InvestigationRequest) -> dict[str, Any]:
+    permission = PERMISSIONS(payload.principal_id, "analytics")
+    if not permission.allowed:
+        raise HTTPException(status_code=403, detail=permission.reason)
+    investigation = engine.create(payload.prompt, payload.principal_id)
+    plan = agent_pack.plan(payload.prompt, payload.principal_id, investigation.investigation_id)
+    prepared = engine.plan(investigation.investigation_id, plan)
+    metric, metric_label, metric_unit = resolve_metric(payload.prompt)
+    tool_request = ToolRequest(
+        tool_name="analytics.query",
+        principal_id=prepared.principal_id,
+        input={"metric": metric},
+    )
+    updated = engine.run_tools(investigation.investigation_id, [tool_request])
+    engine.begin_validation(investigation.investigation_id)
+    result = updated.tool_results[-1]
+    value = result.data.get("value", 0) if isinstance(result.data, Mapping) else 0
+    answer, facts, _ = format_metric_answer(metric, metric_label, value, metric_unit)
+    finding = AgentFinding(
+        agent_name=plan["agents"][0],
+        answer=answer,
+        facts=tuple(facts),
+        evidence_ids=result.evidence_references,
+        confidence="high" if result.status == "succeeded" else "low",
+        limitations=result.warnings,
+    )
+    decision = agent_pack.decision_brief(investigation.investigation_id, (finding,))
+    record = evidence_pipeline.build_record(
+        updated,
+        decision,
+        required_claims=decision.facts,
+        key_drivers=("Governed analytics result",),
+        follow_up_questions=("Which site or segment contributes most to this result?",),
+    )
+    return {"plan": plan, "decision_record": record.__dict__, "tool_result": result.__dict__}
+
+
 @app.post("/api/executive/brief")
 def executive_brief(payload: ExecutiveBriefRequest):
-  return build_executive_brief(payload.prompt, payload.principal_id, payload.conversation_id)
+    return build_executive_brief(payload.prompt, payload.principal_id, payload.conversation_id, payload.executive_role)
+
+
+@app.get("/api/conversations/{conversation_id}")
+def get_conversation(conversation_id: str) -> dict[str, Any]:
+        return {"conversation_id": conversation_id, "messages": conversation_history.get(conversation_id, [])}

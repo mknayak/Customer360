@@ -173,7 +173,7 @@ class GraphStore:
             evidence=(self._node_ref(self._nodes[key]),) + tuple(self._edge_ref(edge) for edge in edges),
         )
 
-    def paths(self, from_id: str, to_id: str, max_depth: int = 4) -> ToolExecution:
+    def paths(self, from_id: str, to_id: str, max_depth: int = 6) -> ToolExecution:
         start = self._resolve_id(from_id)
         target = self._resolve_id(to_id)
         if not 1 <= max_depth <= 8:
@@ -312,6 +312,6 @@ def graph_tool_handlers(graph: GraphStore) -> dict[str, Any]:
     return {
         "graph.search": lambda inputs: graph.search(inputs["query"], inputs.get("max_results", 100)),
         "graph.neighbors": lambda inputs: graph.neighbors(inputs["entity_type"], inputs["entity_id"], inputs.get("relationship_types", ()), inputs.get("max_results", 100)),
-        "graph.paths": lambda inputs: graph.paths(inputs["from_id"], inputs["to_id"], inputs.get("max_depth", 4)),
+        "graph.paths": lambda inputs: graph.paths(inputs["from_id"], inputs["to_id"], inputs.get("max_depth", 6)),
         "graph.relationship_summary": lambda inputs: graph.relationship_summary(inputs["entity_type"], inputs["entity_id"]),
     }

@@ -149,38 +149,38 @@ remain follow-up integration work.
 
 ### Phase 8: Semantic layer
 
-- [ ] Governed definitions for revenue, customer, retention, conversion, promotion, product performance, visit, and cart abandonment
-- [ ] Metric ownership, source, grain, formula, exclusions, and effective dates
-- [ ] Resolve business terms before analytical querying
+- [x] Governed definitions for revenue, customer, retention, conversion, promotion, product performance, visit, and cart abandonment
+- [x] Metric ownership, source, grain, formula, exclusions, and effective dates
+- [x] Resolve business terms before analytical querying
 
 ### Phase 9: Knowledge graph
 
-- [ ] Customer, Product, Promotion, Site, Segment, Campaign, Order, and Feedback entities
-- [ ] Relationship synchronization from source IDs
-- [ ] Multi-hop relationship queries
+- [x] Customer, Product, Promotion, Site, Segment, Campaign, Order, and Feedback entities
+- [x] Relationship synchronization from source IDs
+- [x] Multi-hop relationship queries
 
 ### Phase 10: RAG and GraphRAG
 
-- [ ] Document ingestion and chunking
-- [ ] Embeddings and vector retrieval
-- [ ] Graph traversal and hybrid retrieval
-- [ ] Evidence references for retrieved context
+- [x] Document ingestion and chunking
+- [x] Embeddings and vector retrieval
+- [x] Graph traversal and hybrid retrieval
+- [x] Evidence references for retrieved context
 
 ### Phase 11: Agentic intelligence
 
-- [ ] Governed agent tools over service and analytical interfaces
-- [ ] Executive Orchestrator
-- [ ] Customer, Product, Promotion, Digital, Feedback, and Analytics agents
-- [ ] Permission checks before retrieval and tool execution
-- [ ] Evidence-backed investigation and decision contracts
+- [x] Governed agent tools over service and analytical interfaces
+- [x] Executive Orchestrator
+- [x] Customer, Product, Promotion, Digital, Feedback, and Analytics agents
+- [x] Permission checks before retrieval and tool execution
+- [x] Evidence-backed investigation and decision contracts
 
 ### Phase 12: Executive experience
 
-- [ ] CEO/CFO decision experience
-- [ ] Conversation history
-- [ ] Source and evidence view
-- [ ] Charts and drill-down
-- [ ] Follow-up questions
+- [x] CEO/CFO decision experience
+- [x] Conversation history
+- [x] Source and evidence view
+- [x] Charts and drill-down
+- [x] Follow-up questions
 
 ## Architectural Guardrails
 

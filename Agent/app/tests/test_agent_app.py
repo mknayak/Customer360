@@ -43,7 +43,7 @@ def test_executive_brief_exposes_traceable_decision_sections():
     client = TestClient(app)
     response = client.post(
         "/api/executive/brief",
-        json={"prompt": "Which KPI needs attention?", "principal_id": "cfo-1"},
+        json={"prompt": "Which KPI needs attention?", "principal_id": "cfo-1", "executive_role": "CEO"},
     )
 
     assert response.status_code == 200
@@ -51,9 +51,63 @@ def test_executive_brief_exposes_traceable_decision_sections():
     assert body["question"] == "Which KPI needs attention?"
     assert body["facts"]
     assert body["metrics"][0]["label"] == "Revenue"
-    assert body["evidence"][0]["source"] == "analytics.query"
+    assert body["evidence"][0]["source"] in {"analytics.query", "data-platform:/api/kpis/revenue"}
     assert body["follow_up_questions"]
     assert body["conversation_id"]
+    assert body["executive_role"] == "CEO"
+    history = client.get(f"/api/conversations/{body['conversation_id']}")
+    assert history.status_code == 200
+    assert history.json()["messages"]
+
+
+def test_executive_brief_selects_metric_from_question():
+    response = TestClient(app).post(
+        "/api/executive/brief",
+        json={"prompt": "What is the cart abandonment rate?", "principal_id": "cfo-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"][0]["label"] == "Cart abandonment"
+    assert body["evidence"][0]["query"]["metric"] == "cart_abandonment"
+
+
+def test_executive_brief_classifies_customer_retention():
+    response = TestClient(app).post(
+        "/api/executive/brief",
+        json={"prompt": "How is customer retention?", "principal_id": "cfo-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"][0]["label"] == "Customer retention"
+    assert body["evidence"][0]["query"]["metric"] == "retention"
+
+
+def test_segment_conversion_does_not_fall_back_to_revenue():
+    response = TestClient(app).post(
+        "/api/executive/brief",
+        json={"prompt": "What segments of users converts to customer?", "principal_id": "cfo-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"][0]["label"] == "Segment conversion"
+    assert "segment assignments" in body["answer"]
+    assert body["evidence"][0]["query"]["metric"] == "segment_conversion"
+
+
+def test_product_performance_brief_has_renderable_metric_value():
+    response = TestClient(app).post(
+        "/api/executive/brief",
+        json={"prompt": "What is most selling product?", "principal_id": "cfo-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"][0]["label"] == "Product performance"
+    assert isinstance(body["metrics"][0]["value"], (list, int, float))
+    assert "[object Object]" not in body["answer"]
 
 
 def test_create_and_run_investigation():
@@ -70,3 +124,87 @@ def test_create_and_run_investigation():
     body = run_response.json()
     assert body["status"] in {"running", "completed", "validating"}
     assert "tool_results" in body
+
+
+def test_semantic_lookup_endpoint_returns_governed_definition():
+    response = TestClient(app).post("/api/semantic/lookup", json={"term": "conversion rate"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["status"] == "resolved"
+    assert body["evidence_references"] == ["metric-definition:customer360.conversion"]
+
+
+def test_graph_sync_and_path_endpoint():
+    client = TestClient(app)
+    response = client.post(
+        "/api/graph/sync",
+        json={
+            "entities": [
+                {"entity_type": "customer", "entity_id": "customer-test"},
+                {"entity_type": "order", "entity_id": "order-test"},
+            ],
+            "relationships": [
+                {"from_type": "customer", "from_id": "customer-test", "relationship_type": "customer_order", "to_type": "order", "to_id": "order-test"}
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    path = client.get("/api/graph/paths?from_id=customer-test&to_id=order-test")
+    assert path.status_code == 200
+    assert path.json()["data"]["found"] is True
+
+
+def test_rag_ingestion_search_and_authorization():
+    client = TestClient(app)
+    ingest = client.post(
+        "/api/rag/documents",
+        json={
+            "document_id": "brief-agent-test",
+            "title": "Product launch brief",
+            "content": "Trail shoe launch notes for gold customers and the spring campaign.",
+            "source": "marketing:briefs",
+            "document_type": "brief",
+            "authorized_principals": ["executive"],
+        },
+    )
+    assert ingest.status_code == 200
+    assert ingest.json()["chunks"] == 1
+
+    unauthorized = client.post(
+        "/api/rag/search",
+        json={"query": "trail shoe launch", "principal_id": "analyst"},
+    )
+    assert unauthorized.status_code == 200
+    assert unauthorized.json()["data"]["passages"] == []
+
+    result = client.post(
+        "/api/rag/search",
+        json={"query": "trail shoe launch", "principal_id": "executive"},
+    )
+    assert result.status_code == 200
+    assert result.json()["data"]["passages"][0]["document_id"] == "brief-agent-test"
+    assert result.json()["evidence_references"][0].startswith("document-chunk:")
+
+
+def test_governed_investigation_routes_agents_and_builds_decision_record():
+    response = TestClient(app).post(
+        "/api/agent/investigate",
+        json={"prompt": "Why did revenue fall?", "principal_id": "cfo-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "finance-intelligence" in body["plan"]["agents"]
+    assert body["decision_record"]["evidence"]
+    assert body["decision_record"]["status"] in {"validated", "blocked"}
+
+
+def test_investigation_permission_is_fail_closed():
+    response = TestClient(app).post(
+        "/api/agent/investigate",
+        json={"prompt": "Why did revenue fall?", "principal_id": "unknown-principal"},
+    )
+
+    assert response.status_code == 403

@@ -25,3 +25,25 @@ def test_cart_abandonment_kpi_is_curated_from_events(tmp_path):
 
     assert warehouse.kpi("cart_abandonment")["value"] == 0.5
     warehouse.close()
+
+
+def test_order_backfill_replaces_event_stub_with_items(tmp_path):
+    warehouse = EventWarehouse(tmp_path / "analytics.sqlite3")
+    warehouse.ingest([{"event_id": "order-1", "source_service": "shopping", "event_type": "OrderCreated", "aggregate_type": "order", "aggregate_id": "order-1", "occurred_at": "2026-01-01T00:00:00Z", "payload": {"customer_id": "customer-1", "payment_status": "succeeded"}}])
+    warehouse.ingest([{"event_id": "order-backfill-1", "source_service": "shopping", "event_type": "OrderCreated", "aggregate_type": "order", "aggregate_id": "order-1", "occurred_at": "2026-01-01T00:00:00Z", "payload": {"customer_id": "customer-1", "payment_status": "succeeded", "total_amount": 25, "items": [{"product_id": "product-1", "quantity": 2, "unit_price": 12.5}]}}])
+
+    assert warehouse.kpi("product_performance")["value"] == [{"product_id": "product-1", "units": 2, "revenue": 25.0}]
+    warehouse.close()
+
+
+def test_retention_kpi_measures_repeat_successful_customers(tmp_path):
+    warehouse = EventWarehouse(tmp_path / "analytics.sqlite3")
+    events = [
+        {"event_id": "order-1", "source_service": "shopping", "event_type": "OrderCreated", "aggregate_type": "order", "aggregate_id": "order-1", "occurred_at": "2026-01-01T00:00:00Z", "payload": {"customer_id": "customer-1", "payment_status": "succeeded"}},
+        {"event_id": "order-2", "source_service": "shopping", "event_type": "OrderCreated", "aggregate_type": "order", "aggregate_id": "order-2", "occurred_at": "2026-01-02T00:00:00Z", "payload": {"customer_id": "customer-1", "payment_status": "succeeded"}},
+        {"event_id": "order-3", "source_service": "shopping", "event_type": "OrderCreated", "aggregate_type": "order", "aggregate_id": "order-3", "occurred_at": "2026-01-02T00:00:00Z", "payload": {"customer_id": "customer-2", "payment_status": "succeeded"}},
+    ]
+    warehouse.ingest(events)
+
+    assert warehouse.kpi("retention")["value"] == 0.5
+    warehouse.close()
