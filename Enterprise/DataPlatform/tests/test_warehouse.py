@@ -68,3 +68,15 @@ def test_content_and_finance_models_are_curated(tmp_path):
     assert any(item["metric"] == "revenue" for item in warehouse.catalog())
     assert warehouse.reconcile({"revenue": 100, "visits": 0})["status"] == "matched"
     warehouse.close()
+
+
+def test_page_popularity_ranks_content_views_by_page(tmp_path):
+    warehouse = EventWarehouse(tmp_path / "analytics.sqlite3")
+    warehouse.ingest([
+        {"event_id": "view-1", "source_service": "content-site", "event_type": "ContentView", "aggregate_type": "content_page", "aggregate_id": "products", "occurred_at": "2026-01-01T00:00:00Z", "payload": {"content_id": "products"}},
+        {"event_id": "view-2", "source_service": "content-site", "event_type": "ContentView", "aggregate_type": "content_page", "aggregate_id": "products", "occurred_at": "2026-01-01T00:01:00Z", "payload": {"content_id": "products"}},
+        {"event_id": "view-3", "source_service": "content-site", "event_type": "ContentView", "aggregate_type": "content_page", "aggregate_id": "about", "occurred_at": "2026-01-01T00:02:00Z", "payload": {"content_id": "about"}},
+    ])
+
+    assert warehouse.kpi("page_popularity")["value"] == [{"page": "products", "views": 2}, {"page": "about", "views": 1}]
+    warehouse.close()

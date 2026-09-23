@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 from pathlib import Path
@@ -72,6 +73,7 @@ def resolve_metric(prompt: str) -> tuple[str, str, str]:
     ):
         return "segment_conversion", "Segment conversion", "results"
     candidates = (
+        ("page_popularity", "Most visited page", "pages"),
         ("page_dropoff", "Most dropped page", "pages"),
         ("product_performance", "Product performance", "results"),
         ("cart_abandonment", "Cart abandonment", "%"),
@@ -81,6 +83,7 @@ def resolve_metric(prompt: str) -> tuple[str, str, str]:
         ("revenue", "Revenue", "USD"),
     )
     keywords = {
+        "page_popularity": ("most visited page", "popular page", "top page", "most viewed page", "page popularity"),
         "page_dropoff": ("dropped page", "drop off", "dropoff", "page exit", "exited page", "bounce page"),
         "product_performance": ("product", "sku", "units", "sell-through", "underperform"),
         "cart_abandonment": ("abandon", "cart"),
@@ -137,6 +140,18 @@ def format_metric_answer(metric: str, label: str, value: Any, unit: str) -> tupl
         answer = f"The most dropped page is {top['page']} with {top['exits']} exits."
         facts = [f"{row['page']}: {row['exits']} exits" for row in rows[:5]]
         return answer, facts, ["What content or device segment has the highest dropoff?", "What was the average time on the dropped page?"]
+    if metric == "page_popularity":
+        rows = value if isinstance(value, list) else []
+        if not rows:
+            return (
+                "No page-level content views are available yet.",
+                ["The analytics store has no recorded ContentView events."],
+                ["Run the user-visit simulation to generate page activity."],
+            )
+        top = rows[0]
+        answer = f"The most visited page is {top['page']} with {top['views']} views."
+        facts = [f"{row['page']}: {row['views']} views" for row in rows[:5]]
+        return answer, facts, ["Which audience segment visits this page most?", "What is the dropoff rate from this page?"]
     numeric = float(value or 0)
     display_value = numeric * 100 if unit == "%" else numeric
     formatted = f"{display_value:,.2f}" if unit in {"USD", "%"} else f"{display_value:,.0f}"
@@ -227,36 +242,119 @@ def build_executive_brief(
     conversation_id: str | None = None,
     executive_role: str = "CFO",
 ) -> dict[str, Any]:
+    started_at = time.perf_counter()
+    steps: list[dict[str, Any]] = []
+
+    def add_step(title: str, detail: str, meta: Mapping[str, Any] | None = None) -> None:
+        steps.append(
+            {
+                "title": title,
+                "detail": detail,
+                "meta": dict(meta or {}),
+                "elapsed_ms": round((time.perf_counter() - started_at) * 1000, 1),
+            }
+        )
+
     permission = PERMISSIONS(principal_id, "analytics")
+    add_step(
+        "Checked authorization",
+        f"Verified principal '{principal_id}' is permitted to access the analytics domain before touching any tool.",
+        {"principal_id": principal_id, "allowed": permission.allowed, "reason": permission.reason},
+    )
     if not permission.allowed:
         raise HTTPException(status_code=403, detail=permission.reason)
+
     metric, metric_label, metric_unit = resolve_metric(prompt)
+    add_step(
+        "Understood the question",
+        f"Read \"{prompt}\" and mapped the language to the governed metric '{metric_label}'.",
+        {"metric": metric, "executive_role": executive_role},
+    )
+
     investigation = engine.create(prompt, principal_id)
+    add_step(
+        "Opened an investigation",
+        "Created a tracked investigation record so every later step stays auditable.",
+        {"investigation_id": investigation.investigation_id, "status": str(investigation.status)},
+    )
+
     prepared = engine.plan(investigation.investigation_id, {"goal": "investigate_prompt", "scope": "executive"})
+    add_step(
+        "Planned the approach",
+        "Chose the analytics tool path as the fastest route to a governed, evidence-backed answer.",
+        {"plan": dict(prepared.plan), "status": str(prepared.status)},
+    )
+
     tool_request = ToolRequest(
         tool_name="analytics.query",
         principal_id=prepared.principal_id,
         input={"metric": metric},
     )
+    add_step(
+        "Chose a tool to query",
+        f"Decided to call '{tool_request.tool_name}' with metric='{metric}' instead of guessing an answer.",
+        {"tool": tool_request.tool_name, "input": dict(tool_request.input)},
+    )
+
     updated = engine.run_tools(investigation.investigation_id, [tool_request])
-    engine.begin_validation(investigation.investigation_id)
     result = updated.tool_results[-1]
+    live = result.query_metadata.get("live") is True
+    add_step(
+        "Queried the system",
+        f"Executed '{tool_request.tool_name}' against {'the live Data Platform' if live else 'a deterministic fallback dataset (live platform unreachable)'}.",
+        {"source": list(result.source), "live": live, "warnings": list(result.warnings)},
+    )
+
+    engine.begin_validation(investigation.investigation_id)
+    add_step(
+        "Validated the result",
+        "Moved the investigation into validation so the raw tool output is checked before it becomes an answer.",
+        {"status": "validating"},
+    )
+
     value = result.data.get("value", 0) if isinstance(result.data, Mapping) else 0
     answer, facts, follow_up_questions = format_metric_answer(metric, metric_label, value, metric_unit)
+    add_step(
+        "Analyzed the data",
+        f"Interpreted the returned value for '{metric_label}' and drafted facts, hypotheses, and next actions.",
+        {"facts_extracted": len(facts)},
+    )
+
     model_used = "deterministic"
     if isinstance(model_provider, OpenAICompatibleModelProvider):
         try:
             model_response = model_provider.complete(ModelRequest(prompt, tuple(facts), ("semantic.lookup", "analytics.query", "rag.search", "graph.search")))
             answer = model_response.text
             model_used = model_response.model
+            add_step(
+                "Synthesized with the LLM",
+                f"Asked '{model_used}' to phrase the governed facts into an executive answer.",
+                {"model": model_used},
+            )
         except Exception as error:
             facts.append("Configured LLM synthesis failed; the governed deterministic answer was retained.")
             follow_up_questions.append(f"LLM synthesis unavailable: {error}")
-    live = result.query_metadata.get("live") is True
+            add_step(
+                "LLM synthesis failed",
+                "Fell back to the governed deterministic answer template.",
+                {"error": str(error)},
+            )
+    else:
+        add_step(
+            "Synthesized the answer",
+            "Used the deterministic governed template because no LLM provider is configured.",
+            {"model": model_used},
+        )
+
     source_label = result.source[0] if result.source else "analytics.query"
     resolved_conversation_id = conversation_id or investigation.investigation_id
     history = conversation_history.setdefault(resolved_conversation_id, [])
     history.append({"question": prompt, "answer": answer})
+    add_step(
+        "Recorded evidence",
+        f"Attached {len(result.evidence_references or ())} evidence reference(s) so the answer stays traceable to source.",
+        {"evidence_references": list(result.evidence_references or ())},
+    )
     return {
       "investigation_id": investigation.investigation_id,
       "conversation_id": resolved_conversation_id,
@@ -280,6 +378,7 @@ def build_executive_brief(
         } for reference, source in zip(result.evidence_references or ("analytics-query",), result.source or ("analytics.query",))],
         "history": history[-5:],
         "tool_results": [result.__dict__],
+        "thinking_steps": steps,
     }
 
 

@@ -11,7 +11,9 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
+
+from .semantic_query import CompiledQuery
 
 
 DEFAULT_DATABASE_PATH = Path(os.getenv("ANALYTICS_DATABASE", Path(__file__).resolve().parents[1] / "data" / "analytics.sqlite3"))
@@ -95,10 +97,31 @@ class EventWarehouse:
                 stored += 1
         return {"received": received, "stored": stored, "duplicates": received - stored}
 
-    def ingest_event_service(self, origin: str, *, limit: int = 1000) -> dict[str, int]:
-        query = urlencode({"limit": limit})
-        with urlopen(f"{origin.rstrip('/')}/api/events?{query}", timeout=10) as response:
-            return self.ingest(json.loads(response.read()))
+    def ingest_event_service(self, origin: str, *, limit: int = 1000, max_batches: int = 100, consumer_id: str = "data-platform") -> dict[str, int]:
+        received = stored = duplicates = batches = 0
+        for _ in range(max_batches):
+            query = urlencode({"limit": limit})
+            with urlopen(f"{origin.rstrip('/')}/api/consumers/{consumer_id}/poll?{query}", timeout=10) as response:
+                envelope = json.loads(response.read())
+            events = envelope.get("events", [])
+            if not events:
+                break
+            result = self.ingest(events)
+            received += result["received"]
+            stored += result["stored"]
+            duplicates += result["duplicates"]
+            batches += 1
+            acknowledgement = Request(
+                f"{origin.rstrip('/')}/api/consumers/{consumer_id}/ack",
+                data=json.dumps({"event_id": events[-1]["event_id"]}).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urlopen(acknowledgement, timeout=10):
+                pass
+            if len(events) < limit:
+                break
+        return {"received": received, "stored": stored, "duplicates": duplicates, "batches": batches}
 
     def backfill_shopping_orders(self, origin: str, *, page_size: int = 100) -> dict[str, int]:
         """Backfill item-level facts when older events predate item payloads."""
@@ -165,6 +188,11 @@ class EventWarehouse:
             if metric == "content_views":
                 row = self.connection.execute("SELECT COUNT(*) AS value FROM curated_content_activity WHERE event_type = 'ContentView'").fetchone()
                 return {"metric": metric, "value": row["value"], "source": "curated_content_activity"}
+            if metric == "page_popularity":
+                rows = self.connection.execute(
+                    "SELECT COALESCE(content_id, '(unknown)') AS page, COUNT(*) AS views FROM curated_content_activity WHERE event_type = 'ContentView' GROUP BY page ORDER BY views DESC, page"
+                ).fetchall()
+                return {"metric": metric, "value": [{"page": row["page"], "views": row["views"]} for row in rows], "source": "curated_content_activity", "definition": "ContentView events grouped by content page"}
             if metric == "content_sessions":
                 row = self.connection.execute("SELECT COUNT(DISTINCT session_id) AS value FROM curated_content_activity WHERE event_type = 'PageVisit'").fetchone()
                 return {"metric": metric, "value": row["value"], "source": "curated_content_activity"}
@@ -240,6 +268,22 @@ class EventWarehouse:
             expected = operational.get(metric)
             checks[metric] = {"analytical": analytical, "operational": expected, "delta": None if expected is None else analytical - expected, "matched": expected is None or analytical == expected}
         return {"status": "matched" if all(item["matched"] for item in checks.values()) else "mismatch", "checks": checks}
+
+    def execute_semantic(self, compiled: CompiledQuery) -> dict[str, Any]:
+        if not compiled.sql.lstrip().upper().startswith("SELECT ") or ";" in compiled.sql:
+            raise ValueError("Semantic query compiler produced non-read-only SQL")
+        with self.lock:
+            rows = self.connection.execute(compiled.sql, compiled.parameters).fetchall()
+        return {
+            "metric": compiled.metric.metric_id,
+            "rows": [dict(row) for row in rows],
+            "query": {"sql": compiled.sql, "parameters": compiled.parameters},
+            "lineage": compiled.metric.lineage,
+            "source_model": compiled.metric.model,
+            "definition": compiled.metric.description,
+            "dimensions": compiled.dimensions,
+            "security_classification": compiled.metric.security_classification,
+        }
 
     @staticmethod
     def _event_id(event: Mapping[str, Any]) -> str:

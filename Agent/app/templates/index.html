@@ -3,78 +3,496 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Customer360 / Executive Intelligence</title>
+    <title>Customer360 / Your Data. Clear Answers.</title>
     <style>
-      :root { --ink: #18232b; --muted: #68747b; --paper: #f5f3ee; --panel: #fffdf8; --line: #d8d5cc; --teal: #087f7a; --coral: #d8664b; --shadow: 0 18px 45px rgba(24,35,43,.08); }
+      :root {
+        --ink: #16212a; --muted: #6b7680; --line: #e4e7e4; --paper: #f6f7f5; --panel: #ffffff;
+        --teal: #0e9488; --teal-dark: #0b7a70; --mint: #e9f7f2; --mint-line: #cdece2;
+        --amber: #b3760f; --amber-bg: #fbf3e2; --coral: #c94f3a;
+        --shadow: 0 10px 28px rgba(22,33,42,.06); --radius: 14px;
+      }
       * { box-sizing: border-box; }
-      body { margin: 0; color: var(--ink); background: var(--paper); font-family: "Avenir Next", "Helvetica Neue", sans-serif; background-image: linear-gradient(115deg, rgba(8,127,122,.06), transparent 35%), linear-gradient(0deg, transparent 96%, rgba(24,35,43,.04) 96%); }
-      header { display: flex; justify-content: space-between; align-items: center; max-width: 1440px; margin: auto; padding: 25px 5vw; border-bottom: 1px solid var(--line); }
-      .brand { letter-spacing: .08em; text-transform: uppercase; font-size: 12px; font-weight: 700; }
-      .brand strong { color: var(--teal); }
-      .status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
-      .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--teal); }
-      main { max-width: 1440px; margin: auto; padding: 48px 5vw 64px; }
-      .intro { display: grid; grid-template-columns: 1.2fr .8fr; gap: 48px; align-items: end; margin-bottom: 36px; }
-      h1, h2, p { margin: 0; }
-      h1 { max-width: 760px; font-family: Georgia, serif; font-size: clamp(38px, 5vw, 72px); line-height: .98; font-weight: 400; letter-spacing: 0; }
-      .lede { color: var(--muted); line-height: 1.65; max-width: 360px; }
-      .question-bar { display: flex; gap: 12px; padding: 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
-      input { min-width: 0; flex: 1; border: 0; background: transparent; padding: 14px; color: var(--ink); font: inherit; outline: 0; }
-      button { border: 0; background: var(--teal); color: white; padding: 0 24px; font: inherit; font-weight: 700; cursor: pointer; }
-      button:hover { background: #066966; }
-      .workspace { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, .8fr); gap: 22px; }
-      .panel { background: var(--panel); border: 1px solid var(--line); padding: 26px; min-height: 180px; }
-      .panel h2 { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 20px; }
-      .answer { grid-row: span 2; min-height: 385px; }
-      .answer-text { font-family: Georgia, serif; font-size: 30px; line-height: 1.2; max-width: 700px; }
-      .facts { display: grid; gap: 12px; margin-top: 30px; }
-      .fact { display: flex; gap: 12px; color: #3d4b50; line-height: 1.45; }
-      .fact::before { content: ""; width: 4px; flex: 0 0 4px; background: var(--coral); }
-      .metric { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding: 4px 0 16px; }
-      .metric-value { font-family: Georgia, serif; font-size: 36px; }
-      .bar { height: 8px; margin-top: 24px; background: #e4e1d8; overflow: hidden; }
-      .bar span { display: block; height: 100%; width: 68%; background: var(--teal); }
-      .list { display: grid; gap: 13px; padding: 0; margin: 0; list-style: none; color: #3d4b50; line-height: 1.45; }
-      .list li { display: flex; gap: 10px; }
-      .list li::before { content: "↳"; color: var(--teal); font-weight: 700; }
-      .evidence { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-      .source { border-left: 3px solid var(--teal); padding-left: 14px; }
-      .source strong { display: block; font-size: 14px; }
-      .source small { display: block; color: var(--muted); margin-top: 5px; }
-      .empty { color: var(--muted); }
-      .loading { opacity: .55; }
-      .brief-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; color: var(--muted); font-size: 13px; }
-      .brief-meta span { border-left: 2px solid var(--teal); padding-left: 8px; }
-      .graph-panel { grid-column: 1 / -1; }
-      .graph-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
-      .graph-controls input, .graph-controls select { border: 1px solid var(--line); background: white; padding: 10px; flex: 0 1 180px; }
-      .graph-controls button { min-height: 42px; }
-      .graph-canvas { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-height: 80px; }
-      .graph-node { border: 1px solid var(--teal); background: #e9f5f3; color: var(--ink); padding: 12px 14px; text-align: left; }
-      .graph-node:hover { background: var(--lime, #d8ef9a); }
-      .graph-edge { color: var(--muted); font-size: 12px; }
-      @media (max-width: 800px) { header { padding: 20px; } main { padding: 34px 20px; } .intro, .workspace { grid-template-columns: 1fr; gap: 24px; } .answer { grid-row: auto; } .evidence { grid-column: auto; grid-template-columns: 1fr; } .question-bar { flex-direction: column; } button { min-height: 48px; } }
+      body { margin: 0; color: var(--ink); background: var(--paper); font-family: "Inter", -apple-system, "Segoe UI", "Helvetica Neue", sans-serif; }
+      button, select, input { font-family: inherit; }
+      a { color: var(--teal); text-decoration: none; }
+      h1, h2, h3, p, ul { margin: 0; }
+
+      .app-shell { display: grid; grid-template-columns: 216px 1fr; min-height: 100vh; }
+
+      /* Side navigation */
+      .sidenav { border-right: 1px solid var(--line); background: var(--panel); padding: 22px 14px; display: flex; flex-direction: column; }
+      .sidenav .brand { font-weight: 800; font-size: 16px; letter-spacing: -.01em; padding: 0 10px 22px; }
+      .sidenav .brand strong { color: var(--teal); }
+      .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer; border: 0; background: transparent; width: 100%; text-align: left; }
+      .nav-item .nav-icon { width: 18px; text-align: center; }
+      .nav-item:hover { background: #f0f2ef; }
+      .nav-item.active { background: var(--mint); color: var(--teal-dark); }
+      .nav-help { margin-top: auto; }
+
+      /* Header + main column */
+      .main-col { display: flex; flex-direction: column; min-width: 0; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 28px; border-bottom: 1px solid var(--line); background: var(--panel); }
+      .topbar .tagline { color: var(--muted); font-size: 12.5px; margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--line); }
+      .topbar-right { display: flex; align-items: center; gap: 16px; color: var(--muted); font-size: 13px; }
+      .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--teal); color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+      .workbench { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 0px; gap: 0; transition: grid-template-columns .18s ease; }
+      .workbench.sidebar-open { grid-template-columns: minmax(0, 1fr) 360px; }
+      .stage-col { padding: 26px 5vw 60px; min-width: 0; }
+      .stage-col.centered { display: flex; flex-direction: column; align-items: center; }
+
+      /* Ask bar (always visible) */
+      .ask-bar { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--mint-line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 8px 8px 8px 18px; max-width: 900px; width: 100%; }
+      .ask-bar .ask-icon { color: var(--teal); font-size: 16px; }
+      .ask-bar input { flex: 1; border: 0; background: transparent; padding: 12px 4px; font-size: 15px; color: var(--ink); outline: 0; }
+      .icon-btn { border: 0; background: transparent; color: var(--muted); font-size: 16px; padding: 8px; cursor: pointer; }
+      .ask-submit { border: 0; background: var(--teal); color: white; width: 42px; height: 42px; border-radius: 10px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+      .ask-submit:hover { background: var(--teal-dark); }
+      .ask-row-meta { display: flex; align-items: center; gap: 14px; max-width: 900px; width: 100%; margin-top: 10px; }
+      .role-select { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; font-weight: 700; color: var(--ink); }
+      .status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+      .status-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: #b7bdb8; }
+      .status-chip.live .dot { background: var(--teal); }
+      .status-chip.fallback .dot { background: var(--amber); }
+
+      /* Hero (idle) state */
+      .hero { text-align: center; margin: 64px auto 40px; max-width: 760px; }
+      .hero h1 { font-size: clamp(28px, 3.4vw, 40px); font-weight: 800; letter-spacing: -.01em; }
+      .hero p { color: var(--muted); font-size: 15px; margin-top: 10px; }
+      .examples { max-width: 900px; width: 100%; margin: 34px auto 0; }
+      .examples-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 12px; }
+      .examples-head a { font-weight: 600; font-size: 12.5px; }
+      .example-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+      .example-chip { display: flex; align-items: center; gap: 10px; text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 14px 16px; font-size: 13px; color: var(--ink); cursor: pointer; }
+      .example-chip:hover { border-color: var(--mint-line); background: var(--mint); }
+      .trust-strip { max-width: 900px; width: 100%; margin: 26px auto 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--mint); border: 1px solid var(--mint-line); border-radius: 12px; padding: 16px 20px; }
+      .trust-strip .trust-copy strong { display: block; font-size: 13.5px; }
+      .trust-strip .trust-copy span { color: var(--muted); font-size: 12.5px; }
+      .trust-strip .trust-icon { font-size: 20px; }
+
+      /* Answer view */
+      .answer-wrap { max-width: 900px; width: 100%; margin: 24px auto 0; }
+      .result-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 26px 26px; }
+      .result-eyebrow { display: flex; align-items: center; justify-content: space-between; }
+      .result-eyebrow .who { display: flex; align-items: center; gap: 10px; }
+      .result-eyebrow .who .bubble { width: 26px; height: 26px; border-radius: 50%; background: var(--mint); color: var(--teal-dark); display: flex; align-items: center; justify-content: center; }
+      .result-eyebrow .who strong { font-size: 13.5px; }
+      .result-eyebrow .who small { display: block; color: var(--muted); font-size: 11.5px; }
+      .result-actions { display: flex; gap: 6px; }
+      .result-actions button { border: 0; background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
+      .result-actions button:hover { background: #f0f2ef; }
+
+      .headline-callout { background: var(--mint); border: 1px solid var(--mint-line); border-radius: 10px; padding: 16px 18px; margin-top: 16px; }
+      .headline-callout .headline { font-size: 18px; font-weight: 800; line-height: 1.35; }
+      .headline-callout .headline .hl { color: var(--teal-dark); }
+      .headline-callout .subline { color: #33443f; font-size: 13.5px; margin-top: 6px; line-height: 1.5; }
+
+      .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+      .stat-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+      .stat-card .stat-label { color: var(--muted); font-size: 12px; }
+      .stat-card .stat-value { font-size: 21px; font-weight: 800; margin-top: 4px; }
+      .stat-card .stat-trend { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+      .bar-panel { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-top: 16px; }
+      .bar-panel h3 { font-size: 12.5px; font-weight: 700; margin-bottom: 12px; }
+      .bar-row { display: grid; grid-template-columns: 120px 1fr 70px; align-items: center; gap: 10px; font-size: 12.5px; margin-bottom: 9px; }
+      .bar-row .bar-label { color: #33443f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .bar-track { background: #eef0ec; border-radius: 6px; height: 8px; overflow: hidden; }
+      .bar-fill { display: block; height: 100%; background: var(--teal); }
+      .bar-row .bar-value { text-align: right; color: var(--muted); }
+
+      .answer-section { margin-top: 16px; }
+      .answer-section h3 { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+      .answer-section.hypotheses { background: var(--amber-bg); border: 1px solid #f0dcb2; border-radius: 10px; padding: 12px 16px; }
+      .answer-section.hypotheses h3 { color: var(--amber); }
+      .answer-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; }
+      .answer-list li { font-size: 13.5px; line-height: 1.5; color: #33443f; }
+      .answer-list.plain li::before { content: "•"; color: var(--teal); margin-right: 8px; }
+
+      .meta-strip { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--mint); border: 1px solid var(--mint-line); border-radius: 10px; padding: 11px 16px; margin-top: 18px; font-size: 12.5px; color: #33443f; flex-wrap: wrap; }
+      .meta-strip a { font-weight: 700; }
+
+      .followups { margin-top: 16px; }
+      .followups-label { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+      .followup-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .followup-chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; color: var(--ink); }
+      .followup-chip:hover { border-color: var(--mint-line); background: var(--mint); }
+
+      details.history-toggle { margin-top: 18px; }
+      details.history-toggle summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+      details.history-toggle ul { margin-top: 10px; }
+
+      .empty-state { color: var(--muted); font-size: 13px; }
+
+      /* Right "How this answer was built" sidebar */
+      .thinking-sidebar { border-left: 1px solid var(--line); background: var(--panel); overflow: hidden; }
+      .thinking-inner { width: 360px; height: 100%; padding: 20px 20px 30px; overflow-y: auto; }
+      .thinking-head { display: flex; align-items: flex-start; justify-content: space-between; }
+      .thinking-head h2 { font-size: 14.5px; font-weight: 800; }
+      .thinking-head p { color: var(--muted); font-size: 12px; margin-top: 4px; max-width: 280px; }
+      .thinking-close { border: 0; background: transparent; font-size: 16px; color: var(--muted); cursor: pointer; }
+
+      .step-list { margin-top: 18px; display: grid; }
+      .step { position: relative; padding: 0 0 20px 32px; }
+      .step::before { content: attr(data-step); position: absolute; left: 0; top: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--teal); color: white; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+      .step::after { content: ""; position: absolute; left: 10px; top: 24px; bottom: -2px; width: 1px; background: var(--line); }
+      .step:last-child::after { display: none; }
+      .step .step-title { font-size: 13px; font-weight: 700; }
+      .step .step-detail { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin-top: 3px; }
+      .step-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+      .step-chip { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 11.5px; color: #33443f; }
+
+      .side-divider { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+      .side-section h3 { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+      .detail-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+      .detail-row span:first-child { color: var(--muted); }
+      .detail-row span:last-child { font-weight: 600; text-align: right; }
+
+      .tech-links details { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+      .tech-links summary { cursor: pointer; font-size: 12.5px; font-weight: 600; }
+      .tech-json { font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; white-space: pre-wrap; word-break: break-word; background: var(--paper); border-radius: 6px; padding: 10px; margin-top: 8px; max-height: 240px; overflow: auto; }
+
+      .graph-controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+      .graph-controls input, .graph-controls select { border: 1px solid var(--line); background: white; border-radius: 6px; padding: 7px; font-size: 12px; flex: 1 1 100px; }
+      .graph-controls button { border: 1px solid var(--teal); background: var(--mint); color: var(--teal-dark); border-radius: 6px; padding: 7px 10px; font-size: 12px; cursor: pointer; }
+      .graph-status { color: var(--muted); font-size: 11.5px; margin: 6px 0; }
+      .graph-canvas { display: flex; flex-wrap: wrap; gap: 8px; }
+      .graph-node { border: 1px solid var(--teal); background: var(--mint); color: var(--ink); border-radius: 6px; padding: 8px 10px; font-size: 11.5px; text-align: left; cursor: pointer; }
+      .graph-edge { color: var(--muted); font-size: 11px; align-self: center; }
+
+      .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+      .toast.show { opacity: 1; }
+
+      @media (max-width: 980px) {
+        .app-shell { grid-template-columns: 1fr; }
+        .sidenav { display: none; }
+        .workbench.sidebar-open { grid-template-columns: 1fr; }
+        .thinking-sidebar { position: fixed; inset: 0 0 0 auto; z-index: 20; }
+        .example-grid { grid-template-columns: 1fr; }
+      }
     </style>
   </head>
   <body>
-    <header><div class="brand"><strong>Customer360</strong> / executive intelligence</div><div class="status">DecisionOS online</div></header>
-    <main>
-      <section class="intro"><div><h1>Make the next decision with the evidence in view.</h1></div><p class="lede">A governed workspace for questions that cross customers, products, sites, campaigns, and revenue.</p></section>
-      <form class="question-bar" id="question-form"><select id="executive-role" aria-label="Executive perspective"><option value="CFO">CFO</option><option value="CEO">CEO</option></select><input id="prompt" autocomplete="off" placeholder="Ask an executive question" aria-label="Executive question"><button type="submit">Investigate</button></form>
-      <section class="workspace" id="workspace" aria-live="polite" style="margin-top:22px">
-        <article class="panel answer"><h2>Decision brief</h2><p class="answer-text empty" id="answer">Your structured brief will appear here.</p><div class="brief-meta"><span id="brief-role">Perspective: —</span><span id="brief-confidence">Confidence: —</span><span id="brief-conversation">Conversation: —</span></div><div class="facts" id="facts"></div><div class="facts" id="limitations"></div></article>
-        <article class="panel"><h2>Primary signal</h2><div class="metric"><span id="metric-label">Awaiting query</span><span class="metric-value" id="metric-value">—</span></div><div class="bar"><span id="metric-bar" style="width:0"></span></div></article>
-        <article class="panel"><h2>Next actions</h2><ul class="list" id="recommendations"><li class="empty">Investigate a question to see recommended next actions.</li></ul></article>
-        <article class="panel evidence"><div><h2>Evidence &amp; lineage</h2><div id="evidence-list" class="empty">No evidence retrieved yet.</div></div><div><h2>Follow-up questions</h2><ul class="list" id="follow-ups"><li class="empty">Suggested follow-ups will appear here.</li></ul><h2 style="margin-top:24px">Conversation history</h2><ul class="list" id="history"><li class="empty">No prior questions.</li></ul></div></article>
-        <article class="panel graph-panel"><h2>Knowledge graph</h2><div class="graph-controls"><select id="graph-entity-type" aria-label="Graph entity type"><option value="customer">Customer</option><option value="product">Product</option><option value="site">Site</option><option value="order">Order</option><option value="campaign">Campaign</option><option value="promotion">Promotion</option></select><input id="graph-entity-id" placeholder="Entity ID, for example customer-1" aria-label="Graph entity ID"><button type="button" id="graph-load">Explore</button><input id="graph-search-query" placeholder="Search graph entities" aria-label="Graph search query"><button type="button" id="graph-search">Search</button></div><div id="graph-status" class="empty">Enter an entity ID or search term.</div><div id="graph-canvas" class="graph-canvas"></div></article>
-      </section>
-    </main>
+    <div class="app-shell">
+      <aside class="sidenav">
+        <div class="brand"><strong>Customer360</strong></div>
+        <button class="nav-item active" data-nav="home"><span class="nav-icon">⌂</span> Home</button>
+        <button class="nav-item" data-nav="conversations"><span class="nav-icon">💬</span> Conversations</button>
+        <button class="nav-item" data-nav="insights"><span class="nav-icon">📈</span> Insights</button>
+        <button class="nav-item" data-nav="sources"><span class="nav-icon">🗄</span> Data Sources</button>
+        <button class="nav-item" data-nav="settings"><span class="nav-icon">⚙</span> Settings</button>
+        <button class="nav-item nav-help" data-nav="help"><span class="nav-icon">?</span> Help</button>
+      </aside>
+      <div class="main-col">
+        <header class="topbar">
+          <div style="display:flex;align-items:center"><strong style="font-weight:800">Customer360</strong><span class="tagline">Your Data. Clear Answers.</span></div>
+          <div class="topbar-right">
+            <span id="today-date"></span>
+            <span title="Notifications">🔔</span>
+            <span class="avatar">U</span>
+          </div>
+        </header>
+        <div class="workbench" id="workbench">
+          <div class="stage-col centered" id="stage-col">
+            <form class="ask-bar" id="question-form">
+              <span class="ask-icon">✦</span>
+              <input id="prompt" autocomplete="off" placeholder="Ask a question or describe what you need…" aria-label="Executive question">
+              <button type="button" class="icon-btn" title="Attachments are not supported yet" disabled>📎</button>
+              <button type="submit" class="ask-submit" aria-label="Ask">→</button>
+            </form>
+            <div class="ask-row-meta">
+              <select id="executive-role" class="role-select" aria-label="Executive perspective"><option value="CFO">CFO view</option><option value="CEO">CEO view</option></select>
+              <span class="status-chip" id="status-chip"><span class="dot"></span><span id="status-chip-label">Governed data</span></span>
+            </div>
+
+            <div id="stage-body" style="width:100%">
+              <section class="hero" id="hero">
+                <h1>Ask anything about your business</h1>
+                <p>Get trusted insights across customers, products, sites, campaigns, and revenue.</p>
+              </section>
+              <section class="examples" id="examples">
+                <div class="examples-head"><span>Try an example</span><a href="#" id="shuffle-examples">↻ See more examples</a></div>
+                <div class="example-grid" id="example-grid"></div>
+              </section>
+              <div class="trust-strip">
+                <div style="display:flex;align-items:center;gap:12px"><span class="trust-icon">🛡️</span><div class="trust-copy"><strong>Trusted, secure, and governed</strong><span>Answers are based on your organisation's data with full traceability.</span></div></div>
+                <a href="#" id="trust-learn-more">Learn more →</a>
+              </div>
+              <section class="answer-wrap" id="answer-wrap" hidden></section>
+            </div>
+          </div>
+          <aside class="thinking-sidebar" id="thinking-sidebar" hidden>
+            <div class="thinking-inner">
+              <div class="thinking-head">
+                <div><h2>How this answer was built</h2><p>A high-level view of how the answer was generated.</p></div>
+                <button class="thinking-close" id="thinking-close" aria-label="Close">✕</button>
+              </div>
+              <div class="step-list" id="thinking-steps"></div>
+              <hr class="side-divider">
+              <div class="side-section" id="data-details">
+                <h3>Data details</h3>
+                <div id="data-details-rows"></div>
+              </div>
+              <hr class="side-divider">
+              <div class="side-section tech-links">
+                <h3>For technical users</h3>
+                <details>
+                  <summary>View queries &amp; metrics</summary>
+                  <div class="tech-json" id="tech-queries">No data yet.</div>
+                </details>
+                <details>
+                  <summary>View data lineage</summary>
+                  <div class="graph-controls">
+                    <select id="graph-entity-type" aria-label="Graph entity type"><option value="customer">Customer</option><option value="product">Product</option><option value="site">Site</option><option value="order">Order</option><option value="campaign">Campaign</option><option value="promotion">Promotion</option></select>
+                    <input id="graph-entity-id" placeholder="Entity ID, e.g. customer-1" aria-label="Graph entity ID">
+                    <button type="button" id="graph-load">Explore</button>
+                  </div>
+                  <div class="graph-controls">
+                    <input id="graph-search-query" placeholder="Search graph entities" aria-label="Graph search query">
+                    <button type="button" id="graph-search">Search</button>
+                  </div>
+                  <div id="graph-status" class="graph-status">Enter an entity ID or search term.</div>
+                  <div id="graph-canvas" class="graph-canvas"></div>
+                </details>
+                <details>
+                  <summary>View raw results</summary>
+                  <div class="tech-json" id="tech-raw">No data yet.</div>
+                </details>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
     <script>
-      const form = document.getElementById('question-form');
+      const EXAMPLES = [
+        { icon: '📊', text: 'How did our revenue perform this quarter?' },
+        { icon: '📦', text: 'Which products are driving growth?' },
+        { icon: '🧑‍🤝‍🧑', text: 'Are customer segments converting well?' },
+        { icon: '🛒', text: 'What is our cart abandonment rate?' },
+        { icon: '📍', text: "What's our most visited page?" },
+        { icon: '🔁', text: 'Show me customer retention trends.' },
+        { icon: '📉', text: 'What is the most dropped page?' },
+        { icon: '💵', text: 'What is our conversion rate?' },
+        { icon: '🚶', text: 'How many visits did we get?' },
+      ];
+      const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const state = { conversationId: null, exampleOffset: 0 };
+
+      document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+      function renderExamples() {
+        const grid = document.getElementById('example-grid');
+        const items = [];
+        for (let i = 0; i < 6; i += 1) items.push(EXAMPLES[(state.exampleOffset + i) % EXAMPLES.length]);
+        grid.innerHTML = items.map(item => `<button type="button" class="example-chip" data-question="${escapeHtml(item.text)}"><span>${item.icon}</span><span>${escapeHtml(item.text)}</span></button>`).join('');
+      }
+      renderExamples();
+      document.getElementById('shuffle-examples').addEventListener('click', event => { event.preventDefault(); state.exampleOffset = (state.exampleOffset + 6) % EXAMPLES.length; renderExamples(); });
+      document.getElementById('example-grid').addEventListener('click', event => {
+        const chip = event.target.closest('[data-question]');
+        if (!chip) return;
+        document.getElementById('prompt').value = chip.dataset.question;
+        document.getElementById('question-form').requestSubmit();
+      });
+
+      function showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 1800);
+      }
+
+      // Nav (mostly cosmetic; "sources" opens the technical sidebar's lineage view)
+      document.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(other => other.classList.remove('active'));
+        item.classList.add('active');
+        const target = item.dataset.nav;
+        if (target === 'sources') {
+          openThinkingSidebar();
+          const details = document.querySelectorAll('.tech-links details')[1];
+          if (details) details.open = true;
+        } else if (target === 'conversations') {
+          const history = document.querySelector('details.history-toggle');
+          if (history) history.open = true;
+        }
+      }));
+
+      function openThinkingSidebar() {
+        document.getElementById('thinking-sidebar').hidden = false;
+        document.getElementById('workbench').classList.add('sidebar-open');
+      }
+      document.getElementById('thinking-close').addEventListener('click', () => {
+        document.getElementById('thinking-sidebar').hidden = true;
+        document.getElementById('workbench').classList.remove('sidebar-open');
+      });
+
+      function renderThinkingStep(step, index) {
+        const metaEntries = Object.entries(step.meta || {}).filter(([, v]) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
+        let chips = '';
+        const sourceLike = metaEntries.find(([key]) => key === 'source' || key === 'evidence_references');
+        if (sourceLike && Array.isArray(sourceLike[1]) && sourceLike[1].length) {
+          chips = `<div class="step-chips">${sourceLike[1].slice(0, 4).map(value => `<span class="step-chip">🗄 ${escapeHtml(String(value))}</span>`).join('')}</div>`;
+        }
+        return `<div class="step" data-step="${index + 1}"><div class="step-title">${escapeHtml(step.title)}</div><div class="step-detail">${escapeHtml(step.detail)}</div>${chips}</div>`;
+      }
+
+      async function revealThinkingSteps(steps) {
+        const container = document.getElementById('thinking-steps');
+        container.innerHTML = '';
+        for (let index = 0; index < (steps || []).length; index += 1) {
+          container.insertAdjacentHTML('beforeend', renderThinkingStep(steps[index], index));
+          await wait(160);
+        }
+        if (!steps || !steps.length) container.innerHTML = '<p class="empty-state">No reasoning steps were recorded for this answer.</p>';
+      }
+
+      function renderDataDetails(data) {
+        const validationSteps = (data.thinking_steps || []).filter(step => /valid|check/i.test(step.title)).length;
+        const sourceCount = new Set((data.evidence || []).map(item => item.source)).size;
+        const rows = [
+          ['Data period', 'Up to ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })],
+          ['Last updated', new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })],
+          ['Data sources used', String(sourceCount || (data.evidence || []).length || 0)],
+          ['Validation checks applied', String(validationSteps)],
+          ['Model', data.model || 'deterministic'],
+        ];
+        document.getElementById('data-details-rows').innerHTML = rows.map(([label, value]) => `<div class="detail-row"><span>${label}</span><span>${escapeHtml(value)}</span></div>`).join('');
+      }
+
+      function parseAnswerSections(text) {
+        const normalized = String(text || '').replace(/\r/g, '').replace(/\*\*/g, '');
+        const sections = [...normalized.matchAll(/(Facts|Hypotheses|Recommendation|Limitations):\s*([\s\S]*?)(?=(?:Facts|Hypotheses|Recommendation|Limitations):|$)/gi)];
+        if (!sections.length) return { headline: normalized, extra: [] };
+        const extra = sections.map(section => {
+          const title = section[1];
+          const items = section[2].trim().replace(/\s+(?=\d+\.\s)/g, '\n').replace(/\s+-\s+/g, '\n- ').split(/\n+/).map(i => i.replace(/^\s*(?:\d+\.\s*|-\s*)/, '').trim()).filter(Boolean);
+          return { title, items };
+        });
+        return { headline: normalized.slice(0, normalized.search(/(Facts|Hypotheses|Recommendation|Limitations):/i)).trim(), extra };
+      }
+
+      function highlightNumbers(text) {
+        return escapeHtml(text).replace(/(\$[\d,.]+[MKB]?|\d[\d,.]*%|\b\d[\d,.]*\b)/g, '<span class="hl">$1</span>');
+      }
+
+      function buildBarRows(facts) {
+        const rows = [];
+        for (const fact of facts) {
+          let match = fact.match(/^(.*?):\s*([\d,]+)\s*units.*?\$?([\d,.]+)\s*revenue/i);
+          if (match) { rows.push({ label: match[1], value: Number(match[2].replace(/,/g, '')) }); continue; }
+          match = fact.match(/^(.*?):\s*([\d.]+)%\s*conversion/i);
+          if (match) { rows.push({ label: match[1], value: Number(match[2]) }); continue; }
+          match = fact.match(/^(.*?):\s*([\d,]+)\s*(views|exits)/i);
+          if (match) rows.push({ label: match[1], value: Number(match[2].replace(/,/g, '')) });
+        }
+        return rows;
+      }
+
+      function renderAnswer(data) {
+        document.getElementById('hero').style.display = 'none';
+        document.getElementById('examples').style.display = 'none';
+        document.querySelector('.trust-strip').style.display = 'none';
+        const wrap = document.getElementById('answer-wrap');
+        wrap.hidden = false;
+
+        const { headline, extra } = parseAnswerSections(data.answer);
+        const barRows = buildBarRows(data.facts || []);
+        const primaryMetric = (data.metrics || [])[0];
+        const isListMetric = primaryMetric && Array.isArray(primaryMetric.value);
+
+        const statCardHtml = primaryMetric ? (isListMetric
+          ? `<div class="stat-card"><div class="stat-label">${escapeHtml(primaryMetric.label)}</div><div class="stat-value">${primaryMetric.value.length} results</div></div>`
+          : `<div class="stat-card"><div class="stat-label">${escapeHtml(primaryMetric.label)}</div><div class="stat-value">${formatMetricValue(primaryMetric)}</div></div>`) : '';
+
+        const barPanelHtml = barRows.length
+          ? `<div class="bar-panel"><h3>Top results</h3>${(() => { const max = Math.max(...barRows.map(r => r.value), 1); return barRows.map(row => `<div class="bar-row"><span class="bar-label">${escapeHtml(row.label)}</span><span class="bar-track"><span class="bar-fill" style="width:${Math.round((row.value / max) * 100)}%"></span></span><span class="bar-value">${row.value.toLocaleString()}</span></div>`).join(''); })()}</div>`
+          : '';
+
+        const factsSection = extra.find(section => section.title.toLowerCase() === 'facts');
+        const keyInsights = (factsSection ? factsSection.items : data.facts || []).filter(item => !/governed analytics query path/i.test(item));
+        const insightsHtml = keyInsights.length
+          ? `<div class="answer-section"><h3>Key insights</h3><ul class="answer-list plain">${keyInsights.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`
+          : '';
+
+        const hypothesesSection = extra.find(section => section.title.toLowerCase() === 'hypotheses');
+        const hypothesesHtml = hypothesesSection && hypothesesSection.items.length
+          ? `<div class="answer-section hypotheses"><h3>Interpretation (not fact)</h3><ul class="answer-list plain">${hypothesesSection.items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`
+          : '';
+
+        const limitations = data.limitations || [];
+        const limitationsHtml = limitations.length
+          ? `<div class="answer-section"><h3>Caveats</h3><ul class="answer-list plain">${limitations.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`
+          : '';
+
+        const recommendationsHtml = (data.recommendations || []).length
+          ? `<div class="answer-section"><h3>Recommended next actions</h3><ul class="answer-list plain">${data.recommendations.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`
+          : '';
+
+        const historyHtml = (data.history || []).length
+          ? `<details class="history-toggle"><summary>Conversation history (${data.history.length})</summary><ul class="answer-list plain">${data.history.map(item => `<li>${escapeHtml(item.question)}</li>`).join('')}</ul></details>`
+          : '';
+
+        wrap.innerHTML = `
+          <div class="result-card">
+            <div class="result-eyebrow">
+              <div class="who"><span class="bubble">✦</span><div><strong>Here's what I found</strong><small>Perspective: ${escapeHtml(data.executive_role)} · Confidence: ${escapeHtml(data.confidence)}</small></div></div>
+              <div class="result-actions">
+                <button type="button" id="share-answer" title="Copy answer">⇧ Share</button>
+                <button type="button" id="reopen-thinking" title="How this answer was built">⋯</button>
+              </div>
+            </div>
+            <div class="headline-callout"><div class="headline">${highlightNumbers(headline)}</div></div>
+            <div class="stat-grid">${statCardHtml}</div>
+            ${barPanelHtml}
+            ${insightsHtml}
+            ${hypothesesHtml}
+            ${limitationsHtml}
+            ${recommendationsHtml}
+            <div class="meta-strip">
+              <span>Based on ${(data.evidence || []).length} evidence reference(s) · ${(data.thinking_steps || []).length} reasoning step(s) · Conversation ${escapeHtml((data.conversation_id || '').slice(0, 8))}</span>
+              <a href="#" id="how-built-link">How this answer was built →</a>
+            </div>
+            <div class="followups">
+              <div class="followups-label">💡 You may also want to ask</div>
+              <div class="followup-chips">${(data.follow_up_questions || []).map(question => `<button type="button" class="followup-chip" data-question="${escapeHtml(question)}">${escapeHtml(question)}</button>`).join('') || '<span class="empty-state">No suggested follow-ups.</span>'}</div>
+            </div>
+            ${historyHtml}
+          </div>`;
+
+        wrap.querySelectorAll('[data-question]').forEach(chip => chip.addEventListener('click', () => {
+          document.getElementById('prompt').value = chip.dataset.question;
+          document.getElementById('question-form').requestSubmit();
+        }));
+        document.getElementById('share-answer').addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(`${data.question}\n\n${data.answer}`); showToast('Answer copied to clipboard'); }
+          catch { showToast('Could not copy to clipboard'); }
+        });
+        document.getElementById('reopen-thinking').addEventListener('click', openThinkingSidebar);
+        document.getElementById('how-built-link').addEventListener('click', event => { event.preventDefault(); openThinkingSidebar(); });
+
+        document.getElementById('tech-queries').textContent = JSON.stringify({ evidence: data.evidence, tool_results: data.tool_results }, null, 2);
+        document.getElementById('tech-raw').textContent = JSON.stringify(data, null, 2);
+
+        const live = !(data.limitations || []).some(item => /fallback/i.test(item));
+        const chip = document.getElementById('status-chip');
+        chip.classList.toggle('live', live);
+        chip.classList.toggle('fallback', !live);
+        document.getElementById('status-chip-label').textContent = live ? 'Live data' : 'Fallback data';
+      }
+
+      function formatMetricValue(metric) {
+        const value = Number(metric.value || 0);
+        if (metric.unit === '%') return (value * 100).toFixed(2) + '%';
+        if (metric.unit === 'USD') return '$' + value.toLocaleString();
+        return value.toLocaleString() + (metric.unit ? ' ' + metric.unit : '');
+      }
+
       const graphCanvas = document.getElementById('graph-canvas');
       const graphStatus = document.getElementById('graph-status');
-          const setList = (id, values) => { document.getElementById(id).innerHTML = (values || []).map(value => `<li>${value}</li>`).join('') || '<li class="empty">None recorded.</li>'; };
-      const graphNode = (node, primary = false) => `<button type="button" class="graph-node" data-graph-type="${node.entity_type}" data-graph-id="${node.entity_id}"><strong>${node.entity_type}</strong><br><small>${node.entity_id}</small></button>`;
+      const graphNode = node => `<button type="button" class="graph-node" data-graph-type="${node.entity_type}" data-graph-id="${node.entity_id}"><strong>${node.entity_type}</strong><br><small>${node.entity_id}</small></button>`;
       async function loadGraphNeighbors(entityType, entityId) {
         graphStatus.textContent = 'Loading relationships…';
         const response = await fetch(`/api/graph/neighbors?entity_type=${encodeURIComponent(entityType)}&entity_id=${encodeURIComponent(entityId)}`);
@@ -89,42 +507,39 @@
         const response = await fetch('/api/graph/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, max_results: 25}) });
         const result = await response.json();
         if (!response.ok) throw new Error(result.detail || 'Graph search failed');
-        graphCanvas.innerHTML = (result.data.entities || []).map(node => graphNode(node)).join('') || '<span class="empty">No graph entities matched.</span>';
+        graphCanvas.innerHTML = (result.data.entities || []).map(node => graphNode(node)).join('') || '<span class="empty-state">No graph entities matched.</span>';
         graphStatus.textContent = `${result.data.entities?.length || 0} entities found`;
       }
       document.getElementById('graph-load').addEventListener('click', () => loadGraphNeighbors(document.getElementById('graph-entity-type').value, document.getElementById('graph-entity-id').value.trim()).catch(error => { graphStatus.textContent = error.message; }));
       document.getElementById('graph-search').addEventListener('click', () => searchGraph(document.getElementById('graph-search-query').value.trim()).catch(error => { graphStatus.textContent = error.message; }));
       graphCanvas.addEventListener('click', event => { const node = event.target.closest('[data-graph-id]'); if (node) loadGraphNeighbors(node.dataset.graphType, node.dataset.graphId).catch(error => { graphStatus.textContent = error.message; }); });
-      form.addEventListener('submit', async event => {
+
+      document.getElementById('question-form').addEventListener('submit', async event => {
         event.preventDefault();
-            const prompt = document.getElementById('prompt').value.trim();
-            const executiveRole = document.getElementById('executive-role').value;
+        const prompt = document.getElementById('prompt').value.trim();
+        const executiveRole = document.getElementById('executive-role').value;
         if (!prompt) return;
-        document.getElementById('answer').textContent = 'Investigating governed sources…';
-        document.getElementById('answer').classList.add('loading');
+        const submitButton = document.querySelector('.ask-submit');
+        submitButton.disabled = true;
+        document.getElementById('thinking-steps').innerHTML = '<p class="empty-state">Planning the investigation…</p>';
         try {
-              const response = await fetch('/api/executive/brief', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt, principal_id: 'cfo-1', executive_role: executiveRole}) });
+          const response = await fetch('/api/executive/brief', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, principal_id: 'cfo-1', executive_role: executiveRole, conversation_id: state.conversationId }),
+          });
           const data = await response.json();
           if (!response.ok) throw new Error(data.detail || 'Investigation failed');
-          document.getElementById('answer').textContent = data.answer;
-          document.getElementById('answer').classList.remove('empty', 'loading');
-              document.getElementById('brief-role').textContent = 'Perspective: ' + data.executive_role;
-              document.getElementById('brief-confidence').textContent = 'Confidence: ' + data.confidence;
-              document.getElementById('brief-conversation').textContent = 'Conversation: ' + data.conversation_id.slice(0, 8);
-          document.getElementById('metric-label').textContent = data.metrics[0]?.label || 'Signal';
-          const metricValue = data.metrics[0]?.value;
-          document.getElementById('metric-value').textContent = Array.isArray(metricValue)
-            ? (data.metrics[0].label === 'Product performance' ? `${metricValue.length} products` : metricValue.length ? `${metricValue.length} segments` : 'Unavailable')
-            : metricValue !== undefined ? (data.metrics[0].unit === '%' ? (Number(metricValue) * 100).toFixed(2) + '%' : data.metrics[0].unit === 'USD' ? '$' + Number(metricValue).toLocaleString() : Number(metricValue).toLocaleString())
-            : '—';
-          document.getElementById('metric-bar').style.width = data.metrics[0] ? '68%' : '0';
-          setList('facts', data.facts);
-              setList('limitations', data.limitations);
-          setList('recommendations', data.recommendations);
-          setList('follow-ups', data.follow_up_questions);
-              setList('history', (data.history || []).map(item => item.question));
-          document.getElementById('evidence-list').innerHTML = data.evidence.map(item => `<div class="source"><strong>${item.id}</strong><small>${item.source} · ${item.query.tool || 'governed query'}</small></div>`).join('') || '<span class="empty">No evidence returned.</span>';
-        } catch (error) { document.getElementById('answer').textContent = error.message; document.getElementById('answer').classList.remove('loading'); }
+          state.conversationId = data.conversation_id;
+          openThinkingSidebar();
+          await revealThinkingSteps(data.thinking_steps);
+          renderDataDetails(data);
+          renderAnswer(data);
+        } catch (error) {
+          showToast(error.message);
+        } finally {
+          submitButton.disabled = false;
+        }
       });
     </script>
   </body>

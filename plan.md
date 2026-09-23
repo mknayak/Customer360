@@ -268,6 +268,7 @@ The phases below extend the local MVP roadmap into the production-capable Enterp
 - [x] Extend raw and curated SQLite layers with content activity and finance facts
 - [x] Add basic data quality metadata for raw event count, latest event time, and curated row counts
 - [x] Add metric catalog, lineage metadata, quality checks, and operational reconciliation endpoints
+- [x] Add retrieval-driven `SemanticQueryPlanner` with domain routing, compact metadata context, constrained query IR, policy validation, deterministic SQL compilation, execution, and lineage output
 - [ ] Add batch and streaming ingestion paths with raw, cleansed, curated, and analytical layers
 - [ ] Add complete data quality checks for completeness, uniqueness, freshness, referential integrity, and reconciliation
 - [ ] Expand catalog and lineage metadata to every curated metric and dimension

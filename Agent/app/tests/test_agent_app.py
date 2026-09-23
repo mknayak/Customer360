@@ -86,6 +86,18 @@ def test_executive_brief_routes_most_dropped_page_to_page_dropoff():
     assert body["evidence"][0]["query"]["metric"] == "page_dropoff"
 
 
+def test_executive_brief_routes_most_visited_page_to_page_popularity():
+    response = TestClient(app).post(
+        "/api/executive/brief",
+        json={"prompt": "What is the most visited page?", "principal_id": "cfo-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"][0]["label"] == "Most visited page"
+    assert body["evidence"][0]["query"]["metric"] == "page_popularity"
+
+
 def test_executive_brief_classifies_customer_retention():
     response = TestClient(app).post(
         "/api/executive/brief",
