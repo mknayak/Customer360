@@ -12,9 +12,21 @@ def test_ingestion_is_idempotent_and_builds_curated_kpis(tmp_path):
     assert warehouse.ingest(events) == {"received": 3, "stored": 3, "duplicates": 0}
     assert warehouse.ingest(events) == {"received": 3, "stored": 0, "duplicates": 3}
     assert warehouse.kpi("revenue")["value"] == 25.0
+    assert warehouse.kpi("average_cart_value")["value"] == 25.0
     assert warehouse.kpi("visits")["value"] == 1
     assert warehouse.kpi("conversion")["value"] == 1.0
     assert warehouse.kpi("product_performance")["value"][0]["units"] == 2
+    warehouse.close()
+
+
+def test_average_cart_value_excludes_failed_orders(tmp_path):
+    warehouse = EventWarehouse(tmp_path / "analytics.sqlite3")
+    warehouse.ingest([
+        {"event_id": "order-success", "source_service": "shopping", "event_type": "OrderCreated", "aggregate_type": "order", "aggregate_id": "order-success", "occurred_at": "2026-01-01T00:00:00Z", "payload": {"payment_status": "succeeded", "total_amount": 30}},
+        {"event_id": "order-failed", "source_service": "shopping", "event_type": "OrderCreated", "aggregate_type": "order", "aggregate_id": "order-failed", "occurred_at": "2026-01-01T00:01:00Z", "payload": {"payment_status": "failed", "total_amount": 100}},
+    ])
+
+    assert warehouse.kpi("average_cart_value")["value"] == 30.0
     warehouse.close()
 
 
@@ -46,6 +58,33 @@ def test_retention_kpi_measures_repeat_successful_customers(tmp_path):
     warehouse.ingest(events)
 
     assert warehouse.kpi("retention")["value"] == 0.5
+    warehouse.close()
+
+
+def test_retention_trend_compares_consecutive_calendar_cohorts(tmp_path):
+    warehouse = EventWarehouse(tmp_path / "analytics.sqlite3")
+    events = [
+        ("a-1", "2026-01-30", "a", "succeeded"),
+        ("b-1", "2026-01-31", "b", "succeeded"),
+        ("a-2", "2026-02-01", "a", "succeeded"),
+        ("a-3", "2026-02-02", "a", "succeeded"),
+        ("c-1", "2026-02-02", "c", "succeeded"),
+        ("b-failed", "2026-02-02", "b", "failed"),
+        ("d-1", "2026-04-01", "d", "succeeded"),
+    ]
+    warehouse.ingest([{"event_id": event_id, "source_service": "shopping", "event_type": "OrderCreated",
+                       "aggregate_type": "order", "aggregate_id": event_id, "occurred_at": date + "T00:00:00Z",
+                       "payload": {"customer_id": customer, "payment_status": status}}
+                      for event_id, date, customer, status in events])
+
+    daily = warehouse.retention_trend("day")["points"]
+    assert daily[0] == {"period": "2026-01-30", "value": None, "numerator": 0, "denominator": 0}
+    assert daily[2] == {"period": "2026-02-01", "value": 0.0, "numerator": 0, "denominator": 1}
+    assert daily[3] == {"period": "2026-02-02", "value": 1.0, "numerator": 1, "denominator": 1}
+    assert daily[-1]["value"] is None
+    assert warehouse.retention_trend("month")["points"][1] == {"period": "2026-02", "value": 0.5, "numerator": 1, "denominator": 2}
+    assert warehouse.retention_trend("month")["points"][2] == {"period": "2026-03", "value": 0.0, "numerator": 0, "denominator": 2}
+    assert warehouse.retention_trend("week")["points"][1]["value"] == 0.5
     warehouse.close()
 
 

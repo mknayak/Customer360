@@ -4,3 +4,4 @@ __pycache__/
 **/*.egg-info/
 Enterprise/Services/*/data/*.sqlite3
 .env
+logs/

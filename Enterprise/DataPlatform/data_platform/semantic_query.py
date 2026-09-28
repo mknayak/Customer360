@@ -15,6 +15,17 @@ def _tokens(value: str) -> tuple[str, ...]:
 
 
 @dataclass(frozen=True)
+class JoinSpec:
+    name: str
+    table: str
+    alias: str
+    left_alias: str
+    left_column: str
+    right_column: str
+    join_type: str = "JOIN"
+
+
+@dataclass(frozen=True)
 class MetricSpec:
     metric_id: str
     name: str
@@ -32,6 +43,7 @@ class MetricSpec:
     owner: str = "data-platform"
     lineage: tuple[str, ...] = ()
     base_predicates: tuple[str, ...] = ()
+    joins: Mapping[str, JoinSpec] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -41,6 +53,7 @@ class SemanticQueryIR:
     filters: Mapping[str, Any] = field(default_factory=dict)
     order: str = "desc"
     limit: int = 25
+    joins: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -68,7 +81,7 @@ class SemanticCatalog:
 class DomainRouter:
     DOMAINS = {
         "digital": ("page", "visit", "traffic", "drop", "exit", "content", "session", "website"),
-        "commerce": ("product", "order", "cart", "purchase", "sales", "units"),
+        "commerce": ("product", "order", "cart", "purchase", "sales", "units", "payment", "failed"),
         "finance": ("revenue", "margin", "profit", "cost", "finance"),
     }
 
@@ -123,11 +136,14 @@ class QueryIRValidator:
         unknown_filters = set(query.filters) - set(metric.filters)
         if unknown_filters:
             raise ValueError(f"Unsupported filters for {metric.metric_id}: {', '.join(sorted(unknown_filters))}")
+        unknown_joins = set(query.joins) - set(metric.joins)
+        if unknown_joins:
+            raise ValueError(f"Unsupported joins for {metric.metric_id}: {', '.join(sorted(unknown_joins))}")
         if query.order not in {"asc", "desc"}:
             raise ValueError("Semantic query order must be asc or desc")
         if not 1 <= query.limit <= 1000:
             raise ValueError("Semantic query limit must be between 1 and 1000")
-        return SemanticQueryIR(query.metric, tuple(dimensions), dict(query.filters), query.order, query.limit)
+        return SemanticQueryIR(query.metric, tuple(dimensions), dict(query.filters), query.order, query.limit, tuple(query.joins))
 
 
 class QueryPolicyGate:
@@ -136,6 +152,9 @@ class QueryPolicyGate:
     def __init__(self, grants: Mapping[str, Iterable[str]] | None = None) -> None:
         grants = grants or {"cfo-1": ("digital", "commerce", "finance"), "executive-1": ("digital", "commerce", "finance")}
         self._grants = {principal: frozenset(domains) for principal, domains in grants.items()}
+
+    def domains(self, principal_id: str) -> frozenset[str]:
+        return self._grants.get(principal_id, frozenset())
 
     def authorize(self, principal_id: str, metric: MetricSpec) -> None:
         domains = self._grants.get(principal_id, frozenset())
@@ -153,6 +172,17 @@ class SQLCompiler:
             clauses.append(f"{metric.filters[name]} = ?")
             parameters.append(value)
         sql = f"SELECT {', '.join(select)} FROM {metric.model}"
+        aliases = {"base"}
+        for join_name in query.joins:
+            join = metric.joins.get(join_name)
+            if join is None:
+                raise ValueError(f"Unsupported join for {metric.metric_id}: {join_name}")
+            if join.alias in aliases or join.left_alias not in aliases:
+                raise ValueError(f"Invalid join path for {metric.metric_id}: {join_name}")
+            if join.join_type not in {"JOIN", "INNER JOIN", "LEFT JOIN"}:
+                raise ValueError(f"Unsupported join type for {join_name}: {join.join_type}")
+            sql += f" {join.join_type} {join.table} AS {join.alias} ON {join.left_alias}.{join.left_column} = {join.alias}.{join.right_column}"
+            aliases.add(join.alias)
         if clauses:
             sql += " WHERE " + " AND ".join(clauses)
         if selected_dimensions:
@@ -189,10 +219,12 @@ class SemanticQueryPlanner:
 def default_metrics() -> tuple[MetricSpec, ...]:
     return (
         MetricSpec("revenue", "Revenue", "finance", "Succeeded order revenue", ("sales", "net sales"), "curated_orders", "ROUND(SUM(total_amount), 2)", "value", {"customer": "customer_id", "period": "substr(occurred_at, 1, 10)"}, {"customer": "customer_id", "payment_status": "payment_status"}, lineage=("OrderCreated", "curated_orders")),
+        MetricSpec("average_cart_value", "Average cart value", "commerce", "Average total amount of successful orders", ("average order value", "average cart", "avg cart value", "cart value"), "curated_orders", "ROUND(AVG(total_amount), 2)", "value", {"period": "substr(occurred_at, 1, 10)"}, {}, lineage=("OrderCreated", "curated_orders"), base_predicates=("payment_status = 'succeeded'",)),
+        MetricSpec("payment_failures", "Payment failures", "commerce", "Count of PaymentFailed events", ("payment failed", "failed payment", "payment failure", "declined payment"), "raw_events", "COUNT(*)", "value", {"period": "substr(occurred_at, 1, 10)", "customer": "json_extract(payload, '$.customer_id')", "failure_reason": "json_extract(payload, '$.failure_reason')"}, {}, lineage=("PaymentFailed", "raw_events"), base_predicates=("event_type = 'PaymentFailed'",)),
         MetricSpec("visits", "Visits", "digital", "Count of site visits", ("traffic", "visit volume"), "curated_visits", "COUNT(*)", "value", {"site": "site_id", "customer": "customer_id", "period": "substr(occurred_at, 1, 10)"}, {"site": "site_id", "customer": "customer_id"}, lineage=("VisitStarted", "curated_visits")),
         MetricSpec("content_views", "Content views", "digital", "Count of content view events", ("page views", "content viewed"), "curated_content_activity", "COUNT(*)", "value", {"page": "content_id", "customer": "customer_id", "period": "substr(occurred_at, 1, 10)"}, {"page": "content_id", "customer": "customer_id"}, ("page",), lineage=("ContentView", "curated_content_activity"), base_predicates=("event_type = 'ContentView'",)),
         MetricSpec("page_popularity", "Page popularity", "digital", "Content views grouped by page", ("most visited page", "popular page", "top page", "most viewed page"), "curated_content_activity", "COUNT(*)", "views", {"page": "content_id", "period": "substr(occurred_at, 1, 10)"}, {"page": "content_id"}, ("page",), lineage=("ContentView", "curated_content_activity"), base_predicates=("event_type = 'ContentView'",)),
         MetricSpec("average_time_on_page", "Average time on page", "digital", "Average content dwell time in seconds", ("dwell time", "time on page"), "curated_content_activity", "ROUND(AVG(duration_seconds), 2)", "value", {"page": "content_id", "period": "substr(occurred_at, 1, 10)"}, {"page": "content_id"}, ("page",), lineage=("TimeOnPage", "curated_content_activity"), base_predicates=("event_type = 'TimeOnPage'",)),
         MetricSpec("page_dropoff", "Page dropoff", "digital", "Sessions ending on each page", ("most dropped page", "page exits", "drop off page", "dropoff"), "curated_content_activity", "COUNT(*)", "exits", {"page": "content_id", "period": "substr(occurred_at, 1, 10)"}, {"page": "content_id"}, ("page",), lineage=("Exit", "curated_content_activity"), base_predicates=("event_type = 'Exit'",)),
-        MetricSpec("product_performance", "Product performance", "commerce", "Units and revenue by product", ("top product", "selling product", "units sold"), "curated_order_items", "SUM(quantity)", "units", {"product": "product_id"}, {"product": "product_id"}, ("product",), lineage=("OrderCreated.items", "curated_order_items")),
+        MetricSpec("product_performance", "Product performance", "commerce", "Units and revenue by product", ("top product", "selling product", "units sold"), "curated_order_items", "SUM(quantity)", "units", {"product": "base.product_id", "customer": "orders.customer_id"}, {"product": "base.product_id", "customer": "orders.customer_id"}, ("product",), lineage=("OrderCreated.items", "curated_order_items"), joins={"orders": JoinSpec("orders", "curated_orders", "orders", "base", "order_id", "order_id")}),
     )

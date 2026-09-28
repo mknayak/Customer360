@@ -1,4 +1,5 @@
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -7,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "Agent" / "DecisionOS" / "runtime"))
 sys.path.insert(0, str(ROOT))
 
-from Agent.app.main import app  # noqa: E402
+from Agent.app.main import app, resolve_metric, select_metric_with_model, format_trend_answer  # noqa: E402
+from Agent.DecisionOS.runtime.decision_os.model_provider import DeterministicModelProvider, ModelResponse, OpenAICompatibleModelProvider  # noqa: E402
 
 
 def test_health_ok():
@@ -74,6 +76,97 @@ def test_executive_brief_selects_metric_from_question():
     assert body["evidence"][0]["query"]["metric"] == "cart_abandonment"
 
 
+def test_executive_brief_counts_payment_failures():
+    response = TestClient(app).post(
+        "/api/executive/brief",
+        json={"prompt": "How many times payment failed?", "principal_id": "cfo-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"][0]["label"] == "Payment failures"
+    assert body["evidence"][0]["query"]["metric"] == "payment_failures"
+    assert "payment failures" in body["answer"].lower()
+
+
+def test_metric_resolver_maps_average_cart_value():
+    assert resolve_metric("avg cart value") == ("average_cart_value", "Average cart value", "USD")
+
+
+def test_deterministic_planner_selects_orders_join_for_customer_product_analysis(monkeypatch):
+    monkeypatch.setattr("Agent.app.main.model_provider", DeterministicModelProvider())
+
+    selection, model, query = select_metric_with_model("Which customers bought which products?")
+
+    assert selection[0] == "product_performance"
+    assert model == "deterministic"
+    assert query["joins"] == ["orders"]
+    assert query["dimensions"] == ["customer", "product"]
+
+
+def test_deterministic_planner_groups_payment_failures_by_customer(monkeypatch):
+    monkeypatch.setattr("Agent.app.main.model_provider", DeterministicModelProvider())
+
+    selection, model, query = select_metric_with_model("How do payment failures vary by customer?")
+
+    assert selection[0] == "payment_failures"
+    assert model == "deterministic"
+    assert query == {"profile_dimension": "country"}
+    assert select_metric_with_model("Payment failures by age group")[2] == {"profile_dimension": "age_group"}
+
+
+def test_payment_failure_customer_question_returns_aggregate_comparison(monkeypatch):
+    from Agent.app import main
+    from Agent.DecisionOS.runtime.decision_os.tools import ToolExecution
+
+    monkeypatch.setattr(main, "model_provider", DeterministicModelProvider())
+
+    def grouped_result(inputs):
+        assert inputs["metric"] == "payment_failures"
+        assert inputs["profile_dimension"] in {"country", "age_group"}
+        rows = [{"group": "US", "value": 9}, {"group": "GB", "value": 4}] if inputs["profile_dimension"] == "country" else []
+        return ToolExecution(
+            data={"value": rows, "definition": "PaymentFailed events by current CRM profile", "unmatched_events": 2, "suppressed_groups": 1},
+            source=("data-platform:/api/payment-failures/by-profile",),
+            query_metadata={"metric": "payment_failures", "profile_dimension": inputs["profile_dimension"], "live": True},
+            evidence_references=("analytics:payment_failures",),
+        )
+
+    dispatcher = main.engine._tools
+    monkeypatch.setitem(dispatcher._tools, "analytics.query", replace(dispatcher._tools["analytics.query"], handler=grouped_result))
+    client = TestClient(app)
+    response = client.post("/api/executive/brief", json={"prompt": "How do payment failures vary by customer?", "principal_id": "cfo-1"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "US (9 events)" in body["answer"]
+    assert "GB (4 events)" in body["answer"]
+    assert body["profile_breakdown"]["rows"] == [{"group": "US", "value": 9}, {"group": "GB", "value": 4}]
+    assert body["evidence"][0]["query"]["profile_dimension"] == "country"
+    assert "not payment failure rates" in body["limitations"][0]
+
+    sparse = client.post("/api/executive/brief", json={"prompt": "How do payment failures vary by customer?", "principal_id": "cfo-1", "profile_dimension": "age_group"}).json()
+    assert sparse["profile_breakdown"]["rows"] == []
+    assert "No reportable" in sparse["answer"]
+    assert any("Fewer than two" in item for item in sparse["limitations"])
+
+
+def test_llm_planner_returns_semantic_query_ir(monkeypatch):
+    provider = OpenAICompatibleModelProvider("https://llm.example", "secret", "test-model")
+    provider.complete = lambda request: ModelResponse(
+        '{"tool":"analytics.query","query":{"metric":"revenue","dimensions":["period"],"filters":{"payment_status":"succeeded"},"order":"desc","limit":10}}',
+        "test",
+        "test-model",
+    )
+    monkeypatch.setattr("Agent.app.main.model_provider", provider)
+
+    selection, model, query = select_metric_with_model("revenue by day")
+
+    assert selection == ("revenue", "Revenue", "USD")
+    assert model == "test-model"
+    assert query == {"granularity": "day"}
+
+
 def test_executive_brief_routes_most_dropped_page_to_page_dropoff():
     response = TestClient(app).post(
         "/api/executive/brief",
@@ -108,6 +201,39 @@ def test_executive_brief_classifies_customer_retention():
     body = response.json()
     assert body["metrics"][0]["label"] == "Customer retention"
     assert body["evidence"][0]["query"]["metric"] == "retention"
+
+
+def test_retention_period_question_returns_chart_points_and_comparison(monkeypatch):
+    from Agent.DecisionOS.runtime.decision_os.tools import ToolExecution
+
+    monkeypatch.setattr("Agent.app.main.model_provider", DeterministicModelProvider())
+    def trend_result(inputs):
+        assert inputs["metric"] == "retention"
+        assert inputs["granularity"] == "month"
+        points = [{"period": "2026-01", "value": None, "numerator": 0, "denominator": 0},
+                  {"period": "2026-02", "value": 0.5, "numerator": 1, "denominator": 2},
+                  {"period": "2026-03", "value": 0.75, "numerator": 3, "denominator": 4}]
+        return ToolExecution(data={"value": points, "definition": "Adjacent calendar month cohorts"},
+                             source=("data-platform:/api/trends",), query_metadata={"metric": "retention", "granularity": "month", "live": True},
+                             evidence_references=("analytics:retention",))
+    from Agent.app import main
+    dispatcher = main.engine._tools
+    monkeypatch.setitem(dispatcher._tools, "analytics.query", replace(dispatcher._tools["analytics.query"], handler=trend_result))
+
+    response = TestClient(app).post("/api/executive/brief", json={"prompt": "How does retention vary by period?", "principal_id": "cfo-1"})
+    assert response.status_code == 200
+    body = response.json()
+    assert "increased" in body["answer"]
+    assert "25.00 percentage points" in body["answer"]
+    assert body["time_series"]["points"][0]["value"] is None
+    assert body["time_series"]["granularity"] == "month"
+    assert "repeat-purchase KPI" in body["limitations"][0]
+
+
+def test_single_period_cannot_establish_trend():
+    answer, facts, _ = format_trend_answer("Customer retention", "%", [{"period": "2026-01", "value": 0.5}], "month")
+    assert "not enough data" in answer
+    assert facts == ["2026-01: 50.00%"]
 
 
 def test_segment_conversion_does_not_fall_back_to_revenue():

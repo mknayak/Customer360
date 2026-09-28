@@ -29,7 +29,8 @@ def _schema(*required: str, **properties: str) -> dict[str, Any]:
 
 TOOL_CATALOG: tuple[ToolContract, ...] = (
     ToolContract("customer.snapshot", "Retrieve an authorized cross-service customer snapshot.", "customer", _schema("customer_id", customer_id="string")),
-    ToolContract("analytics.query", "Run a governed analytical query.", "analytics", _schema("metric", metric="string")),
+    ToolContract("analytics.query", "Run a governed analytical query.", "analytics", _schema("metric", metric="string", dimensions="array", filters="object", order="string", limit="integer", principal_id="string")),
+    ToolContract("analytics.sql", "Generate, validate and run read-only SQL over the pruned, authorized warehouse schema.", "analytics", _schema("question", "principal_id", question="string", principal_id="string"), timeout_seconds=90.0),
     ToolContract("analytics.segment", "Compare a metric by approved segment.", "analytics", _schema("metric", "segment", metric="string", segment="string")),
     ToolContract("analytics.funnel", "Calculate an approved funnel.", "analytics", _schema("funnel", funnel="string")),
     ToolContract("analytics.compare_periods", "Compare a metric across periods.", "analytics", _schema("metric", "current_period", "prior_period", metric="string", current_period="string", prior_period="string")),

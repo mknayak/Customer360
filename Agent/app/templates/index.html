@@ -100,6 +100,22 @@
       .bar-track { background: #eef0ec; border-radius: 6px; height: 8px; overflow: hidden; }
       .bar-fill { display: block; height: 100%; background: var(--teal); }
       .bar-row .bar-value { text-align: right; color: var(--muted); }
+      .profile-panel { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 16px; }
+      .profile-panel .bar-panel { margin-top: 12px; }
+      .profile-panel .bar-row { grid-template-columns: minmax(90px, 160px) 1fr 70px; }
+      .profile-panel .bar-label { white-space: normal; overflow-wrap: anywhere; }
+
+      .trend-panel { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 16px; }
+      .trend-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .trend-head h3 { font-size: 14px; }
+      .trend-modes { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+      .trend-modes button { background: var(--panel); border: 0; padding: 6px 11px; color: var(--ink); cursor: pointer; font-size: 12px; }
+      .trend-modes button + button { border-left: 1px solid var(--line); }
+      .trend-modes button[aria-pressed="true"] { background: var(--teal-dark); color: white; }
+      .trend-plot { width: 100%; height: auto; display: block; margin-top: 12px; }
+      .trend-axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+      .trend-definition { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 10px; }
+      .trend-points { margin-top: 8px; color: var(--muted); font-size: 12px; }
 
       .answer-section { margin-top: 16px; }
       .answer-section h3 { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
@@ -276,6 +292,14 @@
         { icon: '📉', text: 'What is the most dropped page?' },
         { icon: '💵', text: 'What is our conversion rate?' },
         { icon: '🚶', text: 'How many visits did we get?' },
+        { icon: '🔗', text: 'Which customers bought which products?' },
+        { icon: '🏆', text: 'Which products generate the most revenue by customer?' },
+        { icon: '💳', text: 'How do payment failures vary by customer?' },
+        { icon: '📅', text: 'Show revenue by day and customer.' },
+        { icon: '🧺', text: 'Which orders contain our best-selling products?' },
+        { icon: '🧭', text: 'Compare visits and purchases by customer.' },
+        { icon: '📈', text: 'Which products have the strongest customer demand?' },
+        { icon: '🔍', text: 'Break down product performance by customer.' },
       ];
       const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -391,6 +415,42 @@
         return rows;
       }
 
+      function renderTrend(series) {
+        if (!series) return '';
+        const points = series.points || [];
+        const valid = points.filter(point => point.value !== null && Number.isFinite(Number(point.value)));
+        const format = value => series.unit === '%' ? (value * 100).toFixed(2) + '%' : series.unit === 'USD' ? '$' + Number(value).toLocaleString() : Number(value).toLocaleString();
+        const buttons = ['day', 'week', 'month'].map(mode => `<button type="button" data-granularity="${mode}" aria-pressed="${series.granularity === mode}">${mode[0].toUpperCase() + mode.slice(1)}</button>`).join('');
+        if (!valid.length) return `<section class="trend-panel"><div class="trend-head"><h3>${escapeHtml(series.label)} by period</h3><div class="trend-modes" aria-label="Time granularity">${buttons}</div></div><p class="trend-definition">No comparable period data available.</p></section>`;
+        const values = valid.map(point => Number(point.value));
+        const minimum = Math.min(...values, 0);
+        const maximum = Math.max(...values, series.unit === '%' ? 1 : 0);
+        const position = (point, index) => ({ x: 36 + (index / Math.max(points.length - 1, 1)) * 628, y: 170 - (Number(point.value) - minimum) / (maximum - minimum || 1) * 145 });
+        const segments = [];
+        let segment = [];
+        points.forEach((point, index) => {
+          if (point.value === null) { if (segment.length) segments.push(segment); segment = []; }
+          else segment.push(position(point, index));
+        });
+        if (segment.length) segments.push(segment);
+        const paths = segments.filter(line => line.length > 1).map(line => `<polyline points="${line.map(item => `${item.x},${item.y}`).join(' ')}" fill="none" stroke="#0b7a70" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
+        const markers = points.map((point, index) => {
+          if (point.value === null) return '';
+          const { x, y } = position(point, index);
+          return `<circle cx="${x}" cy="${y}" r="5" fill="#0b7a70"><title>${escapeHtml(point.period)}: ${escapeHtml(format(point.value))}${point.denominator !== undefined ? ` (${point.numerator}/${point.denominator})` : ''}</title></circle>`;
+        }).join('');
+        return `<section class="trend-panel"><div class="trend-head"><h3>${escapeHtml(series.label)} by period</h3><div class="trend-modes" aria-label="Time granularity">${buttons}</div></div><svg class="trend-plot" viewBox="0 0 700 195" role="img" aria-label="${escapeHtml(series.label)} trend from ${escapeHtml(points[0].period)} to ${escapeHtml(points[points.length - 1].period)}"><line x1="36" y1="170" x2="664" y2="170" stroke="#d7dfdb"/>${paths}${markers}</svg><div class="trend-axis"><span>${escapeHtml(points[0].period)}</span><span>${escapeHtml(points[points.length - 1].period)}</span></div><details class="trend-points"><summary>View ${points.length} period data points</summary><ul class="answer-list">${points.map(point => `<li>${escapeHtml(point.period)}: ${point.value === null ? 'Not available' : escapeHtml(format(point.value))}${point.denominator !== undefined ? ` (${point.numerator}/${point.denominator} eligible)` : ''}</li>`).join('')}</ul></details><p class="trend-definition">${escapeHtml(series.definition)} · Source: ${escapeHtml(series.source)}</p></section>`;
+      }
+
+      function renderProfileBreakdown(breakdown) {
+        if (!breakdown) return '';
+        const modes = [['country', 'Country'], ['age_group', 'Age group']].map(([dimension, title]) => `<button type="button" data-profile-dimension="${dimension}" aria-pressed="${breakdown.dimension === dimension}">${title}</button>`).join('');
+        const rows = breakdown.rows || [];
+        const maximum = Math.max(1, ...rows.map(row => Number(row.value)));
+        const bars = rows.map(row => `<div class="bar-row"><span class="bar-label" title="${escapeHtml(row.group)}">${escapeHtml(row.group)}</span><span class="bar-track"><span class="bar-fill" style="width:${Math.round(Number(row.value) / maximum * 100)}%"></span></span><span class="bar-value">${Number(row.value).toLocaleString()}</span></div>`).join('');
+        return `<section class="profile-panel"><div class="trend-head"><h3>Payment failures by ${breakdown.dimension === 'country' ? 'country' : 'age group'}</h3><div class="trend-modes" aria-label="Customer profile grouping">${modes}</div></div>${rows.length ? `<div class="bar-panel">${bars}</div>` : '<p class="trend-definition">No reportable groups available.</p>'}${breakdown.definition ? `<p class="trend-definition">${escapeHtml(breakdown.definition)} · Source: ${escapeHtml(breakdown.source)}</p>` : ''}</section>`;
+      }
+
       function renderAnswer(data) {
         document.getElementById('hero').style.display = 'none';
         document.getElementById('examples').style.display = 'none';
@@ -403,7 +463,7 @@
         const primaryMetric = (data.metrics || [])[0];
         const isListMetric = primaryMetric && Array.isArray(primaryMetric.value);
 
-        const statCardHtml = primaryMetric ? (isListMetric
+        const statCardHtml = data.time_series || data.profile_breakdown ? '' : primaryMetric ? (isListMetric
           ? `<div class="stat-card"><div class="stat-label">${escapeHtml(primaryMetric.label)}</div><div class="stat-value">${primaryMetric.value.length} results</div></div>`
           : `<div class="stat-card"><div class="stat-label">${escapeHtml(primaryMetric.label)}</div><div class="stat-value">${formatMetricValue(primaryMetric)}</div></div>`) : '';
 
@@ -446,6 +506,8 @@
             </div>
             <div class="headline-callout"><div class="headline">${highlightNumbers(headline)}</div></div>
             <div class="stat-grid">${statCardHtml}</div>
+            ${renderTrend(data.time_series)}
+            ${renderProfileBreakdown(data.profile_breakdown)}
             ${barPanelHtml}
             ${insightsHtml}
             ${hypothesesHtml}
@@ -466,6 +528,18 @@
           document.getElementById('prompt').value = chip.dataset.question;
           document.getElementById('question-form').requestSubmit();
         }));
+        wrap.querySelectorAll('[data-granularity]').forEach(button => button.addEventListener('click', () => {
+          if (button.getAttribute('aria-pressed') === 'true') return;
+          state.trendGranularity = button.dataset.granularity;
+          document.getElementById('prompt').value = data.question;
+          document.getElementById('question-form').requestSubmit();
+        }));
+        wrap.querySelectorAll('[data-profile-dimension]').forEach(button => button.addEventListener('click', () => {
+          if (button.getAttribute('aria-pressed') === 'true') return;
+          state.profileDimension = button.dataset.profileDimension;
+          document.getElementById('prompt').value = data.question;
+          document.getElementById('question-form').requestSubmit();
+        }));
         document.getElementById('share-answer').addEventListener('click', async () => {
           try { await navigator.clipboard.writeText(`${data.question}\n\n${data.answer}`); showToast('Answer copied to clipboard'); }
           catch { showToast('Could not copy to clipboard'); }
@@ -476,11 +550,11 @@
         document.getElementById('tech-queries').textContent = JSON.stringify({ evidence: data.evidence, tool_results: data.tool_results }, null, 2);
         document.getElementById('tech-raw').textContent = JSON.stringify(data, null, 2);
 
-        const live = !(data.limitations || []).some(item => /fallback/i.test(item));
+        const live = data.tool_results?.[0]?.query_metadata?.live === true;
         const chip = document.getElementById('status-chip');
         chip.classList.toggle('live', live);
         chip.classList.toggle('fallback', !live);
-        document.getElementById('status-chip-label').textContent = live ? 'Live data' : 'Fallback data';
+        document.getElementById('status-chip-label').textContent = live ? 'Live data' : 'Data unavailable';
       }
 
       function formatMetricValue(metric) {
@@ -518,6 +592,10 @@
         event.preventDefault();
         const prompt = document.getElementById('prompt').value.trim();
         const executiveRole = document.getElementById('executive-role').value;
+        const granularity = state.trendGranularity || null;
+        state.trendGranularity = null;
+        const profileDimension = state.profileDimension || null;
+        state.profileDimension = null;
         if (!prompt) return;
         const submitButton = document.querySelector('.ask-submit');
         submitButton.disabled = true;
@@ -526,7 +604,7 @@
           const response = await fetch('/api/executive/brief', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, principal_id: 'cfo-1', executive_role: executiveRole, conversation_id: state.conversationId }),
+            body: JSON.stringify({ prompt, principal_id: 'cfo-1', executive_role: executiveRole, conversation_id: state.conversationId, granularity, profile_dimension: profileDimension }),
           });
           const data = await response.json();
           if (!response.ok) throw new Error(data.detail || 'Investigation failed');

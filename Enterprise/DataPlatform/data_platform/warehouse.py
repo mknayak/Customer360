@@ -65,6 +65,13 @@ class EventWarehouse:
                     revenue REAL NOT NULL DEFAULT 0, cost REAL NOT NULL DEFAULT 0,
                     margin REAL NOT NULL DEFAULT 0, occurred_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS dim_products (
+                    product_id TEXT PRIMARY KEY, sku TEXT, name TEXT, description TEXT,
+                    category_id TEXT, brand TEXT, status TEXT, updated_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS dim_categories (
+                    category_id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_category_id TEXT
+                );
                 """
             )
 
@@ -156,11 +163,119 @@ class EventWarehouse:
             page += 1
         return {"received": received, "stored": stored}
 
+    def backfill_product_catalog(self, origin: str) -> dict[str, int]:
+        """Refresh product and category dimensions from the product service."""
+        with urlopen(f"{origin.rstrip('/')}/api/categories", timeout=10) as response:
+            categories = json.loads(response.read())
+        with urlopen(f"{origin.rstrip('/')}/api/products", timeout=10) as response:
+            products = json.loads(response.read())
+        with self.lock, self.connection:
+            for category in categories:
+                self._upsert_category(category)
+            for product in products:
+                self._upsert_product(product)
+        return {"categories": len(categories), "products": len(products)}
+
+    def _upsert_product(self, product: Mapping[str, Any]) -> None:
+        self.connection.execute(
+            "INSERT OR REPLACE INTO dim_products VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (product["product_id"], product.get("sku"), product.get("name"), product.get("description"), product.get("category_id"), product.get("brand"), product.get("status"), str(product.get("updated_at", ""))),
+        )
+
+    def _upsert_category(self, category: Mapping[str, Any]) -> None:
+        self.connection.execute(
+            "INSERT OR REPLACE INTO dim_categories VALUES (?, ?, ?)",
+            (category["category_id"], category["name"], category.get("parent_category_id")),
+        )
+
+    def trend(self, metric: str, granularity: str) -> dict[str, Any]:
+        if metric == "retention":
+            return self.retention_trend(granularity)
+        sources = {
+            "revenue": ("curated_orders", "SUM(total_amount)", "payment_status = 'succeeded'", "Succeeded order revenue"),
+            "visits": ("curated_visits", "COUNT(*)", "1 = 1", "Number of visits"),
+            "payment_failures": ("raw_events", "COUNT(*)", "event_type = 'PaymentFailed'", "Number of PaymentFailed events"),
+            "average_cart_value": ("curated_orders", "AVG(total_amount)", "payment_status = 'succeeded'", "Average successful order amount"),
+            "conversion": ("curated_visits", "COUNT(*)", "1 = 1", "Succeeded orders divided by visits in each period"),
+            "cart_abandonment": ("curated_carts", "AVG(abandoned)", "1 = 1", "Abandoned carts divided by carts created in each period"),
+        }
+        buckets = {
+            "day": "date(occurred_at)",
+            "week": "date(occurred_at, 'weekday 0', '-6 days')",
+            "month": "substr(occurred_at, 1, 7)",
+        }
+        if metric not in sources or granularity not in buckets:
+            raise ValueError(f"Unsupported trend metric or granularity: {metric}, {granularity}")
+        table, measure, predicate, definition = sources[metric]
+        bucket = buckets[granularity]
+        with self.lock:
+            rows = self.connection.execute(f"""
+                SELECT {bucket} AS period, {measure} AS value FROM {table}
+                WHERE {predicate} AND occurred_at != ''
+                GROUP BY period ORDER BY period
+            """).fetchall()
+            if metric == "conversion":
+                orders = self.connection.execute(f"""
+                    SELECT {bucket} AS period, COUNT(*) AS value FROM curated_orders
+                    WHERE payment_status = 'succeeded' AND occurred_at != ''
+                    GROUP BY period
+                """).fetchall()
+                order_counts = {row["period"]: row["value"] for row in orders}
+        points = []
+        for row in rows:
+            value = row["value"]
+            point = {"period": row["period"], "value": round(value, 4) if value is not None else None}
+            if metric == "conversion":
+                numerator = order_counts.get(row["period"], 0)
+                point.update(value=round(numerator / value, 4), numerator=numerator, denominator=value)
+            points.append(point)
+        return {"metric": metric, "granularity": granularity, "source": table, "definition": definition, "points": points}
+
+    def retention_trend(self, granularity: str) -> dict[str, Any]:
+        periods = {
+            "day": ("date(occurred_at)", "date(periods.period, '-1 day')", "date(period, '+1 day')"),
+            "week": ("date(occurred_at, 'weekday 0', '-6 days')", "date(periods.period, '-7 days')", "date(period, '+7 days')"),
+            "month": ("substr(occurred_at, 1, 7)", "strftime('%Y-%m', date(periods.period || '-01', '-1 month'))", "strftime('%Y-%m', date(period || '-01', '+1 month'))"),
+        }
+        if granularity not in periods:
+            raise ValueError(f"Unsupported trend granularity: {granularity}")
+        bucket, previous, next_period = periods[granularity]
+        with self.lock:
+            rows = self.connection.execute(f"""
+                WITH RECURSIVE activity AS (
+                    SELECT DISTINCT customer_id, {bucket} AS period
+                    FROM curated_orders
+                    WHERE payment_status = 'succeeded' AND customer_id IS NOT NULL AND occurred_at != ''
+                ), periods(period) AS (
+                    SELECT MIN(period) FROM activity HAVING MIN(period) IS NOT NULL
+                    UNION ALL
+                    SELECT {next_period} FROM periods WHERE period < (SELECT MAX(period) FROM activity)
+                )
+                SELECT periods.period, COUNT(DISTINCT prior.customer_id) AS eligible,
+                       COUNT(DISTINCT current.customer_id) AS retained
+                FROM periods
+                LEFT JOIN activity AS prior ON prior.period = {previous}
+                LEFT JOIN activity AS current ON current.period = periods.period AND current.customer_id = prior.customer_id
+                GROUP BY periods.period ORDER BY periods.period
+            """).fetchall()
+        return {
+            "metric": "retention", "granularity": granularity, "source": "curated_orders",
+            "definition": "Customers with successful orders in both this and the preceding calendar period / customers with successful orders in the preceding calendar period",
+            "points": [{"period": row["period"], "value": round(row["retained"] / row["eligible"], 4) if row["eligible"] else None,
+                        "numerator": row["retained"], "denominator": row["eligible"]} for row in rows],
+        }
+
     def kpi(self, metric: str) -> dict[str, Any]:
         with self.lock:
             if metric == "revenue":
                 row = self.connection.execute("SELECT COALESCE(SUM(total_amount), 0) AS value FROM curated_orders WHERE payment_status = 'succeeded'").fetchone()
                 return {"metric": metric, "value": round(row["value"], 2), "source": "curated_orders"}
+            if metric == "average_cart_value":
+                row = self.connection.execute("SELECT COALESCE(AVG(total_amount), 0) AS value FROM curated_orders WHERE payment_status = 'succeeded'").fetchone()
+                return {"metric": metric, "value": round(row["value"], 2), "source": "curated_orders", "definition": "Average total amount of successful orders"}
+            if metric == "payment_failures":
+                row = self.connection.execute("SELECT COUNT(*) AS value FROM raw_events WHERE event_type = 'PaymentFailed'").fetchone()
+                return {"metric": metric, "value": row["value"], "source": "raw_events", "definition": "Count of PaymentFailed events"}
             if metric == "visits":
                 row = self.connection.execute("SELECT COUNT(*) AS value FROM curated_visits").fetchone()
                 return {"metric": metric, "value": row["value"], "source": "curated_visits"}
@@ -240,6 +355,10 @@ class EventWarehouse:
                 "INSERT OR REPLACE INTO curated_finance VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (order_id, payload.get("customer_id"), payload.get("site_id"), payload.get("promotion_id"), float(total), cost, float(total) - cost, occurred_at),
             )
+        elif event_type in {"ProductCreated", "ProductUpdated"} and payload.get("product_id"):
+            self._upsert_product(payload)
+        elif event_type == "CategoryCreated" and payload.get("category_id") and payload.get("name"):
+            self._upsert_category(payload)
         elif event_type in {"PageVisit", "ContentView", "Search", "TimeOnPage", "Exit"}:
             self.connection.execute(
                 "INSERT OR REPLACE INTO curated_content_activity VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -256,6 +375,8 @@ class EventWarehouse:
     def catalog(self) -> list[dict[str, Any]]:
         return [
             {"metric": "revenue", "definition": "Succeeded order total", "source": "curated_orders", "grain": "order", "lineage": "OrderCreated -> curated_orders", "owner": "finance"},
+            {"metric": "average_cart_value", "definition": "Average total amount of successful orders", "source": "curated_orders", "grain": "order", "lineage": "OrderCreated -> curated_orders", "owner": "commerce"},
+            {"metric": "payment_failures", "definition": "Count of PaymentFailed events", "source": "raw_events", "grain": "payment event", "lineage": "PaymentFailed -> raw_events", "owner": "commerce"},
             {"metric": "conversion", "definition": "Succeeded orders divided by visits", "source": "curated_visits+curated_orders", "grain": "period", "lineage": "VisitStarted + OrderCreated", "owner": "digital"},
             {"metric": "content_views", "definition": "Count of content view events", "source": "curated_content_activity", "grain": "content event", "lineage": "ContentView -> curated_content_activity", "owner": "digital"},
             {"metric": "gross_margin", "definition": "Revenue less cost divided by revenue", "source": "curated_finance", "grain": "order", "lineage": "OrderCreated -> curated_finance", "owner": "finance"},
@@ -283,6 +404,37 @@ class EventWarehouse:
             "definition": compiled.metric.description,
             "dimensions": compiled.dimensions,
             "security_classification": compiled.metric.security_classification,
+        }
+
+    def payment_failures_by_profile(self, dimension: str, profiles: Mapping[str, str | None]) -> dict[str, Any]:
+        if dimension not in {"country", "age_group"}:
+            raise ValueError("Unsupported customer profile dimension")
+        with self.lock:
+            rows = self.connection.execute("""
+                SELECT COALESCE(json_extract(events.payload, '$.customer_id'), orders.customer_id) AS customer_id,
+                       COUNT(*) AS failures
+                FROM raw_events AS events
+                LEFT JOIN curated_orders AS orders ON orders.order_id = events.aggregate_id
+                WHERE events.event_type = 'PaymentFailed'
+                GROUP BY COALESCE(json_extract(events.payload, '$.customer_id'), orders.customer_id)
+            """).fetchall()
+        totals: dict[str, int] = {}
+        members: dict[str, set[str]] = {}
+        unmatched = 0
+        for row in rows:
+            group = profiles.get(row["customer_id"]) if row["customer_id"] else None
+            if group:
+                totals[group] = totals.get(group, 0) + row["failures"]
+                members.setdefault(group, set()).add(row["customer_id"])
+            else:
+                unmatched += row["failures"]
+        return {
+            "dimension": dimension,
+            "rows": [{"group": group, "value": count} for group, count in sorted(totals.items(), key=lambda item: (-item[1], item[0])) if len(members[group]) >= 3],
+            "unmatched_events": unmatched,
+            "suppressed_groups": sum(len(members[group]) < 3 for group in totals),
+            "definition": "Count of PaymentFailed events grouped by current CRM customer profile; not a failure rate",
+            "source": "raw_events + curated_orders + CRM customer profiles",
         }
 
     @staticmethod

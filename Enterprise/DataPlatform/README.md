@@ -20,6 +20,14 @@ Endpoints:
 - `GET /api/kpis/product_performance`
 - `POST /api/semantic-query/context` to retrieve a compact, relevant semantic query surface
 - `POST /api/semantic-query/execute` to validate query IR, compile parameterized SQL, and execute it
+- `POST /api/payment-failures/by-profile` with `principal_id` and `dimension` (`country` or `age_group`) to group PaymentFailed event counts by current CRM customer attributes
+
+Payment-failure profile breakdowns resolve event order IDs through curated orders,
+read CRM profiles only after commerce authorization, and return aggregate counts
+without names or customer IDs. Groups with fewer than three distinct customers
+are suppressed; missing profiles are reported as unmatched events. These are
+failure counts, not failure rates (payment-attempt denominators are not available),
+and current profile attributes must not be interpreted as historical demographics.
 
 Raw ingestion is idempotent by `event_id`, `idempotency_key`, or a canonical
 event hash. Curated tables are derived only from ingested event envelopes.
@@ -34,15 +42,21 @@ not accept SQL from callers. It provides two governed operations:
 2. Accept a constrained query IR containing a catalog metric, approved
 	dimensions and filters, sort direction, and row limit.
 
-The Data Platform validates authorization and field compatibility, compiles
-parameterized read-only SQL from allowlisted catalog expressions, executes it,
-and returns rows with definition, source model, lineage, and classification.
+The Data Platform validates authorization, field compatibility, and named join
+paths, compiles parameterized read-only SQL from allowlisted catalog
+expressions, executes it, and returns rows with definition, source model,
+lineage, and classification. A query may request names such as `orders`, but
+the catalog owns the table, aliases, join keys, join type, and join order.
+Callers never provide SQL or `ON` clauses.
 
 Example query IR:
 
 ```json
 {
   "principal_id": "cfo-1",
+  "metric": "product_performance",
+  "dimensions": ["customer", "product"],
+  "joins": ["orders"],
   "metric": "page_dropoff",
   "dimensions": ["page"],
   "filters": {},
