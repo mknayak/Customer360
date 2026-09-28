@@ -81,6 +81,7 @@ class SQLAgent:
                 result.attempts.append({"attempt": attempt, "sql": "", "error": None, "answerable": False})
                 return result
             try:
+                _validate_question_constraints(question, plan.sql)
                 execution = self.execute_sql(plan.sql, principal_id)
             except SQLExecutionError as error:
                 result.attempts.append({"attempt": attempt, "sql": plan.sql, "error": str(error)})
@@ -137,6 +138,14 @@ def summarize_rows(result: SQLAgentResult) -> str:
         return "The query returned no rows."
     first = ", ".join(f"{key}={value}" for key, value in result.rows[0].items())
     return f"Top result: {first} ({len(result.rows)} row(s) returned)."
+
+
+def _validate_question_constraints(question: str, sql: str) -> None:
+    normalized_question = question.casefold()
+    if any(term in normalized_question for term in ("age", "older generation", "older customer")):
+        normalized_sql = sql.casefold()
+        if "dim_customer_profiles" not in normalized_sql or "age_group" not in normalized_sql:
+            raise SQLExecutionError("Generated SQL omitted the requested customer age filter; join dim_customer_profiles through curated_orders and filter age_group.")
 
 
 def render_schema_context(context: Mapping[str, Any]) -> str:

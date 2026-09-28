@@ -72,6 +72,10 @@ class EventWarehouse:
                 CREATE TABLE IF NOT EXISTS dim_categories (
                     category_id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_category_id TEXT
                 );
+                CREATE TABLE IF NOT EXISTS dim_customer_profiles (
+                    customer_id TEXT PRIMARY KEY, age_group TEXT, city TEXT, country TEXT,
+                    preferred_channel TEXT, status TEXT, updated_at TEXT
+                );
                 """
             )
 
@@ -175,6 +179,34 @@ class EventWarehouse:
             for product in products:
                 self._upsert_product(product)
         return {"categories": len(categories), "products": len(products)}
+
+    def backfill_customer_profiles(self, origin: str, *, page_size: int = 100) -> dict[str, int]:
+        """Refresh the non-PII customer profile dimension from the CRM directory."""
+        page = 1
+        profiles: list[Mapping[str, Any]] = []
+        while True:
+            query = urlencode({"page": page, "page_size": page_size})
+            with urlopen(f"{origin.rstrip('/')}/api/customers?{query}", timeout=10) as response:
+                result = json.loads(response.read())
+            customers = result.get("items", [])
+            profiles.extend(customers)
+            if page >= result.get("total_pages", page) or len(customers) < page_size:
+                break
+            page += 1
+        with self.lock, self.connection:
+            self.connection.execute("DELETE FROM dim_customer_profiles")
+            self.connection.executemany(
+                "INSERT INTO dim_customer_profiles VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        customer["customer_id"], customer.get("age_group"), customer.get("city"),
+                        customer.get("country"), customer.get("preferred_channel"),
+                        customer.get("status"), str(customer.get("updated_at", "")),
+                    )
+                    for customer in profiles
+                ],
+            )
+        return {"profiles": len(profiles)}
 
     def _upsert_product(self, product: Mapping[str, Any]) -> None:
         self.connection.execute(

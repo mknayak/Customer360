@@ -132,11 +132,18 @@ TABLE_ANNOTATIONS: Mapping[str, Mapping[str, Any]] = {
         "description": "Product category hierarchy (category, department, product group).",
         "columns": {"category_id": "Category identifier", "name": "Category display name", "parent_category_id": "Parent category in the hierarchy"},
     },
+    "dim_customer_profiles": {
+        "domain": "customer",
+        "grain": "one row per customer",
+        "description": "Current non-PII customer profile attributes for governed demographic segmentation.",
+        "columns": {"customer_id": "Customer identifier", "age_group": "Coarse age band", "city": "Customer city", "country": "Customer country", "preferred_channel": "Preferred contact channel", "status": "Customer lifecycle status", "updated_at": "Profile snapshot freshness"},
+    },
 }
 
 RELATIONSHIPS: tuple[Relationship, ...] = (
     Relationship("curated_order_items", "order_id", "curated_orders", "order_id", "line items belong to an order"),
     Relationship("curated_order_items", "product_id", "dim_products", "product_id", "line item references a product"),
+    Relationship("curated_orders", "customer_id", "dim_customer_profiles", "customer_id", "order belongs to a profiled customer"),
     Relationship("dim_products", "category_id", "dim_categories", "category_id", "product is assigned to a category"),
     Relationship("curated_finance", "order_id", "curated_orders", "order_id", "finance fact for an order"),
     Relationship("raw_events", "aggregate_id", "curated_orders", "order_id", "order events; also filter raw_events.aggregate_type = 'order'"),
@@ -147,6 +154,7 @@ BUSINESS_RULES: tuple[BusinessRule, ...] = (
     BusinessRule("category", "Category comes from dim_categories.name via curated_order_items.product_id -> dim_products.product_id -> dim_products.category_id -> dim_categories.category_id. Use LEFT JOINs and report products without a category as 'Uncategorized' so totals reconcile; disclose the uncategorized share.", ("category", "categories", "department", "product group"), ("curated_order_items", "dim_products", "dim_categories")),
     BusinessRule("brand", "Brand comes from dim_products.brand via curated_order_items.product_id. Report missing brands as 'Unknown'.", ("brand", "brands"), ("curated_order_items", "dim_products")),
     BusinessRule("product_name", "Report products by dim_products.name (LEFT JOIN on product_id, fall back to product_id), never by raw identifier alone.", ("product", "products", "sku", "item"), ("curated_order_items", "dim_products")),
+    BusinessRule("customer_age", "Customer age segmentation comes from dim_customer_profiles.age_group joined through curated_orders.customer_id. Available bands are 18-24, 25-34, 35-44, 45-54, and 55-64. An exact 40+ cohort is not derivable because 35-44 crosses the threshold; do not silently include or exclude that band. Mark an exact 40+ request unanswerable unless the user accepts a 45+ approximation.", ("age", "older", "generation", "40+", "45+", "demographic"), ("curated_orders", "dim_customer_profiles")),
     BusinessRule("time", "Timestamps are ISO-8601 TEXT. Use date(occurred_at) for day, substr(occurred_at, 1, 7) for month, and exclude occurred_at = ''.", ("day", "daily", "week", "weekly", "month", "monthly", "year", "trend", "period", "when", "date", "time"), ()),
     BusinessRule("conversion", "Conversion = succeeded orders / visits for the same period (curated_orders with payment_status = 'succeeded' over curated_visits).", ("conversion", "convert", "funnel"), ("curated_orders", "curated_visits")),
     BusinessRule("cart_abandonment", "Cart abandonment = SUM(curated_carts.abandoned) / COUNT(*) of curated_carts.", ("abandon", "abandonment", "cart"), ("curated_carts",)),

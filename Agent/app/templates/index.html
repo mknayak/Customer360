@@ -105,6 +105,18 @@
       .profile-panel .bar-row { grid-template-columns: minmax(90px, 160px) 1fr 70px; }
       .profile-panel .bar-label { white-space: normal; overflow-wrap: anywhere; }
 
+      .sql-visual { margin-top: 12px; }
+      .sql-visual .bar-row { grid-template-columns: minmax(130px, 210px) 1fr minmax(78px, auto); }
+      .sql-visual .bar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sql-grid-wrap { margin-top: 16px; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+      .sql-grid { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+      .sql-grid th { padding: 10px 12px; background: #f0f4f1; color: #405049; font-size: 11px; letter-spacing: .03em; text-transform: uppercase; text-align: left; white-space: nowrap; }
+      .sql-grid td { padding: 10px 12px; border-top: 1px solid var(--line); white-space: nowrap; }
+      .sql-grid tbody tr:nth-child(even) { background: #fafbf9; }
+      .sql-grid tbody tr:hover { background: var(--mint); }
+      .sql-grid .numeric { text-align: right; font-variant-numeric: tabular-nums; }
+      .sql-result-meta { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
+
       .trend-panel { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 16px; }
       .trend-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
       .trend-head h3 { font-size: 14px; }
@@ -451,6 +463,33 @@
         return `<section class="profile-panel"><div class="trend-head"><h3>Payment failures by ${breakdown.dimension === 'country' ? 'country' : 'age group'}</h3><div class="trend-modes" aria-label="Customer profile grouping">${modes}</div></div>${rows.length ? `<div class="bar-panel">${bars}</div>` : '<p class="trend-definition">No reportable groups available.</p>'}${breakdown.definition ? `<p class="trend-definition">${escapeHtml(breakdown.definition)} · Source: ${escapeHtml(breakdown.source)}</p>` : ''}</section>`;
       }
 
+      function renderSqlResult(result) {
+        if (!result) return '';
+        const columns = result.columns || [];
+        const rows = (result.rows || []).slice(0, 20);
+        const displayName = name => String(name).replace(/_/g, ' ').replace(/\b\w/g, character => character.toUpperCase());
+        const isNumeric = name => rows.some(row => typeof row[name] === 'number' && Number.isFinite(row[name]));
+        const cell = (name, value) => {
+          if (value === null || value === undefined) return '—';
+          if (typeof value !== 'number') return String(value);
+          if (/(share|rate|ratio|percent|percentage)/i.test(name)) return (value * 100).toLocaleString(undefined, { maximumFractionDigits: 2 }) + '%';
+          if (/(revenue|amount|price|cost|sales|profit|margin)/i.test(name)) return value.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+          return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        };
+        const labelColumn = columns.find(name => !isNumeric(name));
+        const valueColumn = columns.find(name => isNumeric(name));
+        const chartRows = labelColumn && valueColumn ? rows.filter(row => Number(row[valueColumn]) >= 0).slice(0, 10) : [];
+        const maximum = Math.max(1, ...chartRows.map(row => Number(row[valueColumn])));
+        const chart = chartRows.length > 1
+          ? `<div class="bar-panel sql-visual"><h3>Top ${chartRows.length} by ${escapeHtml(displayName(valueColumn))}</h3>${chartRows.map(row => `<div class="bar-row"><span class="bar-label" title="${escapeHtml(row[labelColumn])}">${escapeHtml(row[labelColumn])}</span><span class="bar-track"><span class="bar-fill" style="width:${Math.max(2, Math.round(Number(row[valueColumn]) / maximum * 100))}%"></span></span><span class="bar-value">${escapeHtml(cell(valueColumn, row[valueColumn]))}</span></div>`).join('')}</div>`
+          : '';
+        const table = rows.length
+          ? `<div class="sql-grid-wrap"><table class="sql-grid"><thead><tr>${columns.map(name => `<th class="${isNumeric(name) ? 'numeric' : ''}">${escapeHtml(displayName(name))}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${columns.map(name => `<td class="${isNumeric(name) ? 'numeric' : ''}">${escapeHtml(cell(name, row[name]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="sql-result-meta">Showing ${rows.length} result${rows.length === 1 ? '' : 's'}${(result.rows || []).length > rows.length ? ` of ${(result.rows || []).length}` : ''}. Hover over a row to compare exact values.</p>`
+          : `<p class="trend-definition">${escapeHtml(result.reason || 'The query returned no rows.')}</p>`;
+        const sql = result.sql ? `<details class="trend-points"><summary>Generated SQL · tables: ${escapeHtml((result.tables || []).join(', '))}</summary><pre style="white-space:pre-wrap">${escapeHtml(result.sql)}</pre></details>` : '';
+        return `<section class="profile-panel"><div class="trend-head"><h3>Executive data view</h3></div>${chart}${table}${sql}</section>`;
+      }
+
       function renderAnswer(data) {
         document.getElementById('hero').style.display = 'none';
         document.getElementById('examples').style.display = 'none';
@@ -508,6 +547,7 @@
             <div class="stat-grid">${statCardHtml}</div>
             ${renderTrend(data.time_series)}
             ${renderProfileBreakdown(data.profile_breakdown)}
+            ${renderSqlResult(data.sql_result)}
             ${barPanelHtml}
             ${insightsHtml}
             ${hypothesesHtml}

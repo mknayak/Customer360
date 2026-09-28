@@ -28,6 +28,8 @@ def test_ui_route_renders_prompt_box():
     assert "prompt" in html
     assert "graph-load" in html
     assert "graph-search" in html
+    assert "executive data view" in html
+    assert "sql-grid" in html
 
 
 def test_chat_endpoint_runs_investigation_from_prompt():
@@ -260,6 +262,45 @@ def test_product_performance_brief_has_renderable_metric_value():
     assert body["metrics"][0]["label"] == "Product performance"
     assert isinstance(body["metrics"][0]["value"], (list, int, float))
     assert "[object Object]" not in body["answer"]
+
+
+def test_llm_configured_brief_answers_through_sql_agent(monkeypatch):
+    from Agent.app import main
+    from Agent.DecisionOS.runtime.decision_os.tools import ToolExecution
+
+    provider = OpenAICompatibleModelProvider("https://llm.example", "secret", "test-model")
+    provider.complete = lambda request: ModelResponse("Kitchen leads revenue with $20.00 (50%) [sql:q-1].", "test", "test-model")
+    monkeypatch.setattr(main, "model_provider", provider)
+
+    def sql_result(inputs):
+        assert inputs == {"question": "Which category contributes most revenue?", "principal_id": "cfo-1"}
+        data = {"status": "answered", "question": inputs["question"], "sql": "SELECT category, revenue FROM x", "columns": ["category", "revenue"],
+                "rows": [{"category": "Kitchen", "revenue": 20.0}, {"category": "Uncategorized", "revenue": 20.0}], "assumptions": ("Products without a category are Uncategorized",),
+                "reason": "", "attempts": [{"attempt": 1, "sql": "SELECT category, revenue FROM x", "error": None}], "context_tables": ["dim_categories"],
+                "business_rules": ["Revenue counts only succeeded orders."], "execution": {"query_id": "q-1", "tables": ["dim_categories"], "truncated": False}}
+        return ToolExecution(data=data, source=("data-platform:/api/sql/execute",), query_metadata={"tool": "analytics.sql", "live": True}, evidence_references=("sql:q-1",))
+
+    dispatcher = main.engine._tools
+    monkeypatch.setitem(dispatcher._tools, "analytics.sql", replace(dispatcher._tools["analytics.sql"], handler=sql_result))
+
+    body = TestClient(app).post("/api/executive/brief", json={"prompt": "Which category contributes most revenue?", "principal_id": "cfo-1"}).json()
+
+    assert body["answer"].startswith("Kitchen leads revenue")
+    assert body["sql_result"]["rows"][0]["category"] == "Kitchen"
+    assert body["evidence"][0]["id"] == "sql:q-1"
+    assert "Products without a category are Uncategorized" in body["limitations"]
+    assert any(step["title"] == "Retrieved schema context" for step in body["thinking_steps"])
+
+
+def test_sql_agent_is_not_used_for_trend_questions_or_without_llm(monkeypatch):
+    from Agent.app import main
+
+    monkeypatch.setattr(main, "model_provider", DeterministicModelProvider())
+    assert not main.use_sql_agent("Which category contributes most revenue?", None, None)
+    monkeypatch.setattr(main, "model_provider", OpenAICompatibleModelProvider("https://llm.example", "secret", "test-model"))
+    assert main.use_sql_agent("Which category contributes most revenue?", None, None)
+    assert not main.use_sql_agent("How does revenue trend by month?", None, None)
+    assert not main.use_sql_agent("Which customer country has most payment failures?", None, None)
 
 
 def test_create_and_run_investigation():

@@ -21,6 +21,9 @@ Endpoints:
 - `POST /api/semantic-query/context` to retrieve a compact, relevant semantic query surface
 - `POST /api/semantic-query/execute` to validate query IR, compile parameterized SQL, and execute it
 - `POST /api/payment-failures/by-profile` with `principal_id` and `dimension` (`country` or `age_group`) to group PaymentFailed event counts by current CRM customer attributes
+- `POST /api/sql/context` with `principal_id` and `question` to retrieve a pruned, authorized schema context for Text-to-SQL
+- `POST /api/sql/execute` with `principal_id` and `sql` to validate and run one read-only query
+- `POST /api/sql/index/refresh` to re-crawl the schema and rebuild the index (also runs after `/api/ingest/event-service`)
 
 Payment-failure profile breakdowns resolve event order IDs through curated orders,
 read CRM profiles only after commerce authorization, and return aggregate counts
@@ -31,6 +34,31 @@ and current profile attributes must not be interpreted as historical demographic
 
 Raw ingestion is idempotent by `event_id`, `idempotency_key`, or a canonical
 event hash. Curated tables are derived only from ingested event envelopes.
+`dim_products` and `dim_categories` are curated from product events and refreshed
+from the Product service during `/api/ingest/event-service`.
+
+## Text-to-SQL (`data_platform/text_to_sql.py`)
+
+Used by the DecisionOS `analytics.sql` tool for questions the metric catalog
+cannot express. The LLM runs in the agent; this service owns schema metadata,
+authorization and execution.
+
+1. Ingestion (offline): `SchemaCrawler` reads tables, columns, declared join
+   paths, row counts, low-cardinality values, timestamp ranges and join-key null
+   ratios. `SchemaVectorIndex` embeds table and column documents
+   (`HashingEmbedder` by default; any `Embedder` can be plugged in).
+2. Runtime context: vector search selects candidate tables,
+   `JoinGraphLinker` adds bridge tables along the shortest declared join paths, and
+   `BusinessRuleFilter` injects domain rules and governed metric definitions.
+   Tables outside the principal's domains are never returned.
+3. Execution: only a single `SELECT`/`WITH` statement is accepted. It runs on a
+   `mode=ro` connection behind a SQLite authorizer that permits reads of granted
+   tables only (no system catalog, writes, `ATTACH`, `PRAGMA` or extension
+   loading), with a row cap and a time budget. Errors are returned so the agent
+   can repair the SQL.
+
+Only tables listed in `TABLE_ANNOTATIONS` are exposed; add a table there with its
+domain and descriptions, and add join keys to `RELATIONSHIPS`.
 
 ## SemanticQueryPlanner
 

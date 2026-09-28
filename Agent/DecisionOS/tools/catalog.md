@@ -16,6 +16,7 @@ Tools are governed capabilities, not unrestricted access. Every tool must enforc
 |---|---|---|---|
 | `customer.snapshot` | customer | Retrieve an authorized cross-service customer snapshot | Read |
 | `analytics.query` | analytics | Execute a governed analytical query | Read |
+| `analytics.sql` | analytics | Generate, validate and run read-only SQL over a pruned, authorized schema ([spec](analytics-sql.md)) | Read |
 | `analytics.segment` | analytics | Compare a metric by approved segment | Read |
 | `analytics.funnel` | analytics | Calculate an approved funnel | Read |
 | `analytics.compare_periods` | analytics | Compare a metric across periods | Read |

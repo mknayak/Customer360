@@ -85,6 +85,11 @@ def ingest_event_service(origin: str | None = None, limit: int = Query(default=1
         result.update(products=product_result["products"], categories=product_result["categories"])
     except (OSError, ValueError, KeyError, TypeError) as error:
         result["product_catalog_error"] = str(error)
+    try:
+        customer_result = warehouse.backfill_customer_profiles(os.getenv("CRM_ORIGIN", "http://127.0.0.1:8001"))
+        result.update(customer_profiles=customer_result["profiles"])
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        result["customer_profiles_error"] = str(error)
     text_to_sql.refresh()
     return result
 

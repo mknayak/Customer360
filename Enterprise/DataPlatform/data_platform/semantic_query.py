@@ -150,7 +150,7 @@ class QueryPolicyGate:
     """Fail closed before compilation when the principal cannot query a domain."""
 
     def __init__(self, grants: Mapping[str, Iterable[str]] | None = None) -> None:
-        grants = grants or {"cfo-1": ("digital", "commerce", "finance"), "executive-1": ("digital", "commerce", "finance")}
+        grants = grants or {"cfo-1": ("digital", "commerce", "finance", "customer"), "executive-1": ("digital", "commerce", "finance")}
         self._grants = {principal: frozenset(domains) for principal, domains in grants.items()}
 
     def domains(self, principal_id: str) -> frozenset[str]:

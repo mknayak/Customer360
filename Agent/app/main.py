@@ -4,7 +4,7 @@ import json
 import os
 import re
 import time
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from pathlib import Path
 from typing import Any, Literal, Mapping
@@ -24,6 +24,7 @@ from Agent.DecisionOS.runtime.decision_os.graph import GraphStore, graph_tool_ha
 from Agent.DecisionOS.runtime.decision_os.rag import Document, DocumentStore, GraphRAGRetriever, rag_tool_handlers
 from Agent.DecisionOS.runtime.decision_os.semantic import SemanticRegistry
 from Agent.DecisionOS.runtime.decision_os.model_provider import DeterministicModelProvider, OpenAICompatibleModelProvider, ModelRequest
+from Agent.DecisionOS.runtime.decision_os.sql_agent import SQLAgent, SQLAgentResult, SQLExecutionError, summarize_rows
 from Agent.DecisionOS.runtime.decision_os.tools import PermissionMap, ToolExecution, ToolDispatcher
 
 
@@ -107,6 +108,118 @@ def analytics_metric_handler(inputs: Mapping[str, Any]):
             warnings=("Live Data Platform unavailable; deterministic fallback used",),
             evidence_references=(f"analytics-fallback:{metric}",),
         )
+
+
+def _data_platform_post(path: str, payload: Mapping[str, Any], timeout: float = 15) -> dict[str, Any]:
+    origin = os.getenv("DATA_PLATFORM_ORIGIN", "http://127.0.0.1:8010").rstrip("/")
+    request = Request(f"{origin}{path}", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read())
+    except HTTPError as error:
+        detail = json.loads(error.read() or b"{}").get("detail", str(error))
+        if error.code == 403:
+            raise PermissionError(detail) from error
+        if error.code in {400, 422}:
+            raise SQLExecutionError(detail) from error
+        raise
+
+
+def make_sql_agent() -> SQLAgent:
+    return SQLAgent(
+        model_provider,
+        lambda question, principal: _data_platform_post("/api/sql/context", {"question": question, "principal_id": principal}),
+        lambda sql, principal: _data_platform_post("/api/sql/execute", {"sql": sql, "principal_id": principal}, timeout=30),
+    )
+
+
+def analytics_sql_handler(inputs: Mapping[str, Any]) -> ToolExecution:
+    principal_id = inputs["principal_id"]
+    try:
+        _data_platform_post("/api/ingest/event-service", {}, timeout=30)
+    except (URLError, OSError, SQLExecutionError):
+        pass
+    result = make_sql_agent().run(inputs["question"], principal_id)
+    query_id = result.execution.get("query_id")
+    return ToolExecution(
+        data=result.as_dict(),
+        source=("data-platform:/api/sql/execute",) if result.status == "answered" else ("data-platform:/api/sql/context",),
+        definition=tuple(result.business_rules),
+        freshness=result.execution.get("freshness", {}),
+        query_metadata={"tool": "analytics.sql", "sql": result.sql, "tables": result.execution.get("tables", result.context_tables), "attempts": len(result.attempts), "status": result.status, "query_id": query_id, "live": True},
+        evidence_references=(f"sql:{query_id}",) if query_id else (),
+        warnings=tuple(item["error"] for item in result.attempts if item.get("error")),
+    )
+
+
+def use_sql_agent(prompt: str, granularity: str | None, profile_dimension: str | None) -> bool:
+    if not isinstance(model_provider, OpenAICompatibleModelProvider) or os.getenv("SQL_AGENT_ENABLED", "true").casefold() in {"0", "false", "no"}:
+        return False
+    if granularity or profile_dimension or trend_granularity(prompt):
+        return False
+    normalized = prompt.casefold()
+    # CRM profile breakdowns are not in the warehouse; the governed path joins them.
+    return not (resolve_metric(prompt)[0] == "payment_failures" and any(word in normalized for word in ("customer", "country", "location", "age group")))
+
+
+def build_sql_brief(prompt: str, principal_id: str, conversation_id: str | None, executive_role: str, add_step: Any) -> dict[str, Any] | None:
+    investigation = engine.create(prompt, principal_id)
+    engine.plan(investigation.investigation_id, {"goal": "investigate_prompt", "scope": "executive", "path": "text_to_sql"})
+    tool_request = ToolRequest(tool_name="analytics.sql", principal_id=principal_id, input={"question": prompt, "principal_id": principal_id})
+    updated = engine.run_tools(investigation.investigation_id, [tool_request])
+    tool_result = updated.tool_results[-1]
+    if tool_result.status != "succeeded":
+        add_step("SQL agent unavailable", "Falling back to the governed metric path.", {"warnings": list(tool_result.warnings)})
+        return None
+    result = SQLAgentResult(**tool_result.data)
+    add_step("Retrieved schema context", f"Vector search, join-path linking and business rules pruned the warehouse to {len(result.context_tables)} table(s).", {"tables": result.context_tables, "business_rules": len(result.business_rules)})
+    for attempt in result.attempts:
+        add_step(f"SQL attempt {attempt['attempt']}", "Generated SQL was rejected; asked the model to repair it." if attempt.get("error") else "Generated SQL passed validation and ran on the read-only warehouse." if attempt.get("sql") else "Model reported the question is not answerable from the schema.", {"sql": attempt.get("sql"), "error": attempt.get("error")})
+    if result.status == "failed":
+        add_step("SQL agent failed", result.reason, {})
+        return None
+    engine.begin_validation(investigation.investigation_id)
+    evidence_id = tool_result.evidence_references[0] if tool_result.evidence_references else "sql:unanswerable"
+    model_used = getattr(model_provider, "model", "deterministic")
+    try:
+        answer = make_sql_agent().synthesize(result, evidence_id)
+    except Exception as error:
+        answer = summarize_rows(result)
+        add_step("LLM synthesis failed", "Used a deterministic row summary.", {"error": str(error)})
+    else:
+        add_step("Synthesized with the LLM", f"Asked '{model_used}' to answer strictly from the returned rows.", {"model": model_used})
+    limitations = list(result.assumptions)
+    if result.status == "unanswerable":
+        limitations.append("The authorized warehouse schema does not contain the data needed; no substitute metric was used.")
+    if result.execution.get("truncated"):
+        limitations.append(f"Result truncated to {len(result.rows)} rows.")
+    limitations.append("SQL was generated by an LLM from the pruned schema and validated as read-only; review the query before relying on it for decisions.")
+    resolved_conversation_id = conversation_id or investigation.investigation_id
+    history = conversation_history.setdefault(resolved_conversation_id, [])
+    history.append({"question": prompt, "answer": answer})
+    facts = [", ".join(f"{key}: {value}" for key, value in row.items()) for row in result.rows[:10]]
+    return {
+        "investigation_id": investigation.investigation_id,
+        "conversation_id": resolved_conversation_id,
+        "executive_role": executive_role,
+        "model": model_used,
+        "status": "validating" if result.status == "answered" else "insufficient_data",
+        "question": prompt,
+        "answer": answer,
+        "facts": facts,
+        "key_drivers": [],
+        "confidence": "medium" if result.status == "answered" else "low",
+        "limitations": limitations,
+        "recommendations": [],
+        "follow_up_questions": [],
+        "metrics": [],
+        "time_series": None,
+        "profile_breakdown": None,
+        "sql_result": {"status": result.status, "sql": result.sql, "columns": result.columns, "rows": result.rows, "tables": result.execution.get("tables", result.context_tables), "reason": result.reason},
+        "evidence": [{"id": evidence_id, "source": tool_result.source[0], "query": tool_result.query_metadata, "freshness": tool_result.freshness}],
+        "history": history[-5:],
+        "tool_results": [tool_result.__dict__],
+    }
 
 
 def resolve_metric(prompt: str) -> tuple[str, str, str]:
@@ -363,6 +476,7 @@ def build_dispatcher() -> ToolDispatcher:
         {
           "customer.snapshot": customer_snapshot_handler,
             "analytics.query": analytics_metric_handler,
+            "analytics.sql": analytics_sql_handler,
             "semantic.lookup": semantic_registry.lookup_execution,
             "semantic.entity_mapping": entity_mapping_handler,
             **graph_tool_handlers(graph_store),
@@ -449,6 +563,11 @@ def build_executive_brief(
     )
     if not permission.allowed:
         raise HTTPException(status_code=403, detail=permission.reason)
+
+    if use_sql_agent(prompt, granularity, profile_dimension):
+        sql_brief = build_sql_brief(prompt, principal_id, conversation_id, executive_role, add_step)
+        if sql_brief is not None:
+            return {**sql_brief, "thinking_steps": steps}
 
     (metric, metric_label, metric_unit), planner_model, query_spec = select_metric_with_model(prompt)
     if granularity is not None:
