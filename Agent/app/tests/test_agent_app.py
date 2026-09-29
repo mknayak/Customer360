@@ -32,6 +32,34 @@ def test_ui_route_renders_prompt_box():
     assert "sql-grid" in html
 
 
+def test_ui_route_includes_decisionos_dashboard_shell():
+    client = TestClient(app)
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    assert "Ask DecisionOS" in html
+    assert "Executive Live Dashboard" in html
+    assert "Pin to Dashboard" in html
+    assert "pinned-badge-count" in html
+
+
+def test_ui_brief_visuals_use_response_rows():
+    html = TestClient(app).get("/").text
+
+    assert "function getBriefRows(data)" in html
+    assert "data.sql_result.rows" in html
+    assert "data.time_series.points" in html
+    assert "data.profile_breakdown.rows" in html
+    assert "const labels = chartRows.length ? chartRows.map(row => row.label) : ['No data'];" in html
+    assert "const values = chartRows.length ? chartRows.map(row => row.value) : [0];" in html
+
+
+def test_ui_home_page_has_at_least_ten_example_questions():
+    html = TestClient(app).get("/").text
+
+    assert html.count('class="sample-question') >= 10
+
+
 def test_chat_endpoint_runs_investigation_from_prompt():
     client = TestClient(app)
     response = client.post(

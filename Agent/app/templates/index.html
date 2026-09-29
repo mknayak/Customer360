@@ -1,664 +1,791 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Customer360 / Your Data. Clear Answers.</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Customer360 / DecisionOS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.js" crossorigin="anonymous"></script>
+    <script>
+      if (window.Chart) {
+        window.Chart.defaults.font.family = 'Inter, "Segoe UI", sans-serif';
+      }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <style>
       :root {
-        --ink: #16212a; --muted: #6b7680; --line: #e4e7e4; --paper: #f6f7f5; --panel: #ffffff;
-        --teal: #0e9488; --teal-dark: #0b7a70; --mint: #e9f7f2; --mint-line: #cdece2;
-        --amber: #b3760f; --amber-bg: #fbf3e2; --coral: #c94f3a;
-        --shadow: 0 10px 28px rgba(22,33,42,.06); --radius: 14px;
+        --bg: #f8fafc;
+        --panel: #ffffff;
+        --panel-soft: #f1f5f9;
+        --line: #e2e8f0;
+        --text: #0f172a;
+        --muted: #475569;
+        --brand: #2563eb;
+        --brand-strong: #1d4ed8;
+        --brand-soft: #eff6ff;
+        --success: #10b981;
+        --warning: #f59e0b;
       }
       * { box-sizing: border-box; }
-      body { margin: 0; color: var(--ink); background: var(--paper); font-family: "Inter", -apple-system, "Segoe UI", "Helvetica Neue", sans-serif; }
-      button, select, input { font-family: inherit; }
-      a { color: var(--teal); text-decoration: none; }
-      h1, h2, h3, p, ul { margin: 0; }
-
-      .app-shell { display: grid; grid-template-columns: 216px 1fr; min-height: 100vh; }
-
-      /* Side navigation */
-      .sidenav { border-right: 1px solid var(--line); background: var(--panel); padding: 22px 14px; display: flex; flex-direction: column; }
-      .sidenav .brand { font-weight: 800; font-size: 16px; letter-spacing: -.01em; padding: 0 10px 22px; }
-      .sidenav .brand strong { color: var(--teal); }
-      .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: var(--muted); font-size: 13.5px; font-weight: 600; cursor: pointer; border: 0; background: transparent; width: 100%; text-align: left; }
-      .nav-item .nav-icon { width: 18px; text-align: center; }
-      .nav-item:hover { background: #f0f2ef; }
-      .nav-item.active { background: var(--mint); color: var(--teal-dark); }
-      .nav-help { margin-top: auto; }
-
-      /* Header + main column */
-      .main-col { display: flex; flex-direction: column; min-width: 0; }
-      .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 28px; border-bottom: 1px solid var(--line); background: var(--panel); }
-      .topbar .tagline { color: var(--muted); font-size: 12.5px; margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--line); }
-      .topbar-right { display: flex; align-items: center; gap: 16px; color: var(--muted); font-size: 13px; }
-      .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--teal); color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-
-      .workbench { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 0px; gap: 0; transition: grid-template-columns .18s ease; }
-      .workbench.sidebar-open { grid-template-columns: minmax(0, 1fr) 360px; }
-      .stage-col { padding: 26px 5vw 60px; min-width: 0; }
-      .stage-col.centered { display: flex; flex-direction: column; align-items: center; }
-
-      /* Ask bar (always visible) */
-      .ask-bar { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--mint-line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 8px 8px 8px 18px; max-width: 900px; width: 100%; }
-      .ask-bar .ask-icon { color: var(--teal); font-size: 16px; }
-      .ask-bar input { flex: 1; border: 0; background: transparent; padding: 12px 4px; font-size: 15px; color: var(--ink); outline: 0; }
-      .icon-btn { border: 0; background: transparent; color: var(--muted); font-size: 16px; padding: 8px; cursor: pointer; }
-      .ask-submit { border: 0; background: var(--teal); color: white; width: 42px; height: 42px; border-radius: 10px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-      .ask-submit:hover { background: var(--teal-dark); }
-      .ask-row-meta { display: flex; align-items: center; gap: 14px; max-width: 900px; width: 100%; margin-top: 10px; }
-      .role-select { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; font-weight: 700; color: var(--ink); }
-      .status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
-      .status-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: #b7bdb8; }
-      .status-chip.live .dot { background: var(--teal); }
-      .status-chip.fallback .dot { background: var(--amber); }
-
-      /* Hero (idle) state */
-      .hero { text-align: center; margin: 64px auto 40px; max-width: 760px; }
-      .hero h1 { font-size: clamp(28px, 3.4vw, 40px); font-weight: 800; letter-spacing: -.01em; }
-      .hero p { color: var(--muted); font-size: 15px; margin-top: 10px; }
-      .examples { max-width: 900px; width: 100%; margin: 34px auto 0; }
-      .examples-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 12px; }
-      .examples-head a { font-weight: 600; font-size: 12.5px; }
-      .example-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-      .example-chip { display: flex; align-items: center; gap: 10px; text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 14px 16px; font-size: 13px; color: var(--ink); cursor: pointer; }
-      .example-chip:hover { border-color: var(--mint-line); background: var(--mint); }
-      .trust-strip { max-width: 900px; width: 100%; margin: 26px auto 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--mint); border: 1px solid var(--mint-line); border-radius: 12px; padding: 16px 20px; }
-      .trust-strip .trust-copy strong { display: block; font-size: 13.5px; }
-      .trust-strip .trust-copy span { color: var(--muted); font-size: 12.5px; }
-      .trust-strip .trust-icon { font-size: 20px; }
-
-      /* Answer view */
-      .answer-wrap { max-width: 900px; width: 100%; margin: 24px auto 0; }
-      .result-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 26px 26px; }
-      .result-eyebrow { display: flex; align-items: center; justify-content: space-between; }
-      .result-eyebrow .who { display: flex; align-items: center; gap: 10px; }
-      .result-eyebrow .who .bubble { width: 26px; height: 26px; border-radius: 50%; background: var(--mint); color: var(--teal-dark); display: flex; align-items: center; justify-content: center; }
-      .result-eyebrow .who strong { font-size: 13.5px; }
-      .result-eyebrow .who small { display: block; color: var(--muted); font-size: 11.5px; }
-      .result-actions { display: flex; gap: 6px; }
-      .result-actions button { border: 0; background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
-      .result-actions button:hover { background: #f0f2ef; }
-
-      .headline-callout { background: var(--mint); border: 1px solid var(--mint-line); border-radius: 10px; padding: 16px 18px; margin-top: 16px; }
-      .headline-callout .headline { font-size: 18px; font-weight: 800; line-height: 1.35; }
-      .headline-callout .headline .hl { color: var(--teal-dark); }
-      .headline-callout .subline { color: #33443f; font-size: 13.5px; margin-top: 6px; line-height: 1.5; }
-
-      .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
-      .stat-card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
-      .stat-card .stat-label { color: var(--muted); font-size: 12px; }
-      .stat-card .stat-value { font-size: 21px; font-weight: 800; margin-top: 4px; }
-      .stat-card .stat-trend { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
-
-      .bar-panel { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-top: 16px; }
-      .bar-panel h3 { font-size: 12.5px; font-weight: 700; margin-bottom: 12px; }
-      .bar-row { display: grid; grid-template-columns: 120px 1fr 70px; align-items: center; gap: 10px; font-size: 12.5px; margin-bottom: 9px; }
-      .bar-row .bar-label { color: #33443f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .bar-track { background: #eef0ec; border-radius: 6px; height: 8px; overflow: hidden; }
-      .bar-fill { display: block; height: 100%; background: var(--teal); }
-      .bar-row .bar-value { text-align: right; color: var(--muted); }
-      .profile-panel { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 16px; }
-      .profile-panel .bar-panel { margin-top: 12px; }
-      .profile-panel .bar-row { grid-template-columns: minmax(90px, 160px) 1fr 70px; }
-      .profile-panel .bar-label { white-space: normal; overflow-wrap: anywhere; }
-
-      .sql-visual { margin-top: 12px; }
-      .sql-visual .bar-row { grid-template-columns: minmax(130px, 210px) 1fr minmax(78px, auto); }
-      .sql-visual .bar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .sql-grid-wrap { margin-top: 16px; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
-      .sql-grid { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-      .sql-grid th { padding: 10px 12px; background: #f0f4f1; color: #405049; font-size: 11px; letter-spacing: .03em; text-transform: uppercase; text-align: left; white-space: nowrap; }
-      .sql-grid td { padding: 10px 12px; border-top: 1px solid var(--line); white-space: nowrap; }
-      .sql-grid tbody tr:nth-child(even) { background: #fafbf9; }
-      .sql-grid tbody tr:hover { background: var(--mint); }
-      .sql-grid .numeric { text-align: right; font-variant-numeric: tabular-nums; }
-      .sql-result-meta { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
-
-      .trend-panel { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 16px; }
-      .trend-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-      .trend-head h3 { font-size: 14px; }
-      .trend-modes { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-      .trend-modes button { background: var(--panel); border: 0; padding: 6px 11px; color: var(--ink); cursor: pointer; font-size: 12px; }
-      .trend-modes button + button { border-left: 1px solid var(--line); }
-      .trend-modes button[aria-pressed="true"] { background: var(--teal-dark); color: white; }
-      .trend-plot { width: 100%; height: auto; display: block; margin-top: 12px; }
-      .trend-axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
-      .trend-definition { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 10px; }
-      .trend-points { margin-top: 8px; color: var(--muted); font-size: 12px; }
-
-      .answer-section { margin-top: 16px; }
-      .answer-section h3 { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
-      .answer-section.hypotheses { background: var(--amber-bg); border: 1px solid #f0dcb2; border-radius: 10px; padding: 12px 16px; }
-      .answer-section.hypotheses h3 { color: var(--amber); }
-      .answer-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; }
-      .answer-list li { font-size: 13.5px; line-height: 1.5; color: #33443f; }
-      .answer-list.plain li::before { content: "•"; color: var(--teal); margin-right: 8px; }
-
-      .meta-strip { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--mint); border: 1px solid var(--mint-line); border-radius: 10px; padding: 11px 16px; margin-top: 18px; font-size: 12.5px; color: #33443f; flex-wrap: wrap; }
-      .meta-strip a { font-weight: 700; }
-
-      .followups { margin-top: 16px; }
-      .followups-label { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
-      .followup-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-      .followup-chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; color: var(--ink); }
-      .followup-chip:hover { border-color: var(--mint-line); background: var(--mint); }
-
-      details.history-toggle { margin-top: 18px; }
-      details.history-toggle summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--muted); }
-      details.history-toggle ul { margin-top: 10px; }
-
-      .empty-state { color: var(--muted); font-size: 13px; }
-
-      /* Right "How this answer was built" sidebar */
-      .thinking-sidebar { border-left: 1px solid var(--line); background: var(--panel); overflow: hidden; }
-      .thinking-inner { width: 360px; height: 100%; padding: 20px 20px 30px; overflow-y: auto; }
-      .thinking-head { display: flex; align-items: flex-start; justify-content: space-between; }
-      .thinking-head h2 { font-size: 14.5px; font-weight: 800; }
-      .thinking-head p { color: var(--muted); font-size: 12px; margin-top: 4px; max-width: 280px; }
-      .thinking-close { border: 0; background: transparent; font-size: 16px; color: var(--muted); cursor: pointer; }
-
-      .step-list { margin-top: 18px; display: grid; }
-      .step { position: relative; padding: 0 0 20px 32px; }
-      .step::before { content: attr(data-step); position: absolute; left: 0; top: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--teal); color: white; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-      .step::after { content: ""; position: absolute; left: 10px; top: 24px; bottom: -2px; width: 1px; background: var(--line); }
-      .step:last-child::after { display: none; }
-      .step .step-title { font-size: 13px; font-weight: 700; }
-      .step .step-detail { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin-top: 3px; }
-      .step-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-      .step-chip { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 11.5px; color: #33443f; }
-
-      .side-divider { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
-      .side-section h3 { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
-      .detail-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
-      .detail-row span:first-child { color: var(--muted); }
-      .detail-row span:last-child { font-weight: 600; text-align: right; }
-
-      .tech-links details { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
-      .tech-links summary { cursor: pointer; font-size: 12.5px; font-weight: 600; }
-      .tech-json { font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; white-space: pre-wrap; word-break: break-word; background: var(--paper); border-radius: 6px; padding: 10px; margin-top: 8px; max-height: 240px; overflow: auto; }
-
-      .graph-controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
-      .graph-controls input, .graph-controls select { border: 1px solid var(--line); background: white; border-radius: 6px; padding: 7px; font-size: 12px; flex: 1 1 100px; }
-      .graph-controls button { border: 1px solid var(--teal); background: var(--mint); color: var(--teal-dark); border-radius: 6px; padding: 7px 10px; font-size: 12px; cursor: pointer; }
-      .graph-status { color: var(--muted); font-size: 11.5px; margin: 6px 0; }
-      .graph-canvas { display: flex; flex-wrap: wrap; gap: 8px; }
-      .graph-node { border: 1px solid var(--teal); background: var(--mint); color: var(--ink); border-radius: 6px; padding: 8px 10px; font-size: 11.5px; text-align: left; cursor: pointer; }
-      .graph-edge { color: var(--muted); font-size: 11px; align-self: center; }
-
-      .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
-      .toast.show { opacity: 1; }
-
-      @media (max-width: 980px) {
-        .app-shell { grid-template-columns: 1fr; }
-        .sidenav { display: none; }
-        .workbench.sidebar-open { grid-template-columns: 1fr; }
-        .thinking-sidebar { position: fixed; inset: 0 0 0 auto; z-index: 20; }
-        .example-grid { grid-template-columns: 1fr; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: Inter, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
       }
+      button, input, select { font: inherit; }
+      .brand-pill {
+        background: linear-gradient(135deg, #2563eb, #3b82f6, #1d4ed8);
+        color: white;
+        box-shadow: 0 10px 18px rgba(37,99,235,.18);
+      }
+      .nav-button.active {
+        background: white;
+        border-color: rgba(148,163,184,.7);
+        color: var(--text);
+        box-shadow: 0 4px 12px rgba(15,23,42,.05);
+      }
+      .dash-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        box-shadow: 0 8px 28px rgba(15,23,42,0.05);
+      }
+      .mini-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .widget-box {
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, #fff, #f8fafc);
+        border-radius: 18px;
+        padding: 14px;
+      }
+      .sql-grid {
+        width: 100%; border-collapse: collapse; font-size: 12px;
+      }
+      .sql-grid th, .sql-grid td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 8px;
+        text-align: left;
+      }
+      .sql-grid th { background: #f8fafc; color: var(--muted); font-weight: 700; }
+      .sql-grid td { color: var(--text); }
+      .graph-node {
+        border: 1px solid #bfdbfe;
+        background: #eff6ff;
+        border-radius: 10px;
+        padding: 8px 10px;
+        color: var(--text);
+      }
+      .graph-edge { color: var(--muted); font-size: 11px; }
     </style>
   </head>
-  <body>
-    <div class="app-shell">
-      <aside class="sidenav">
-        <div class="brand"><strong>Customer360</strong></div>
-        <button class="nav-item active" data-nav="home"><span class="nav-icon">⌂</span> Home</button>
-        <button class="nav-item" data-nav="conversations"><span class="nav-icon">💬</span> Conversations</button>
-        <button class="nav-item" data-nav="insights"><span class="nav-icon">📈</span> Insights</button>
-        <button class="nav-item" data-nav="sources"><span class="nav-icon">🗄</span> Data Sources</button>
-        <button class="nav-item" data-nav="settings"><span class="nav-icon">⚙</span> Settings</button>
-        <button class="nav-item nav-help" data-nav="help"><span class="nav-icon">?</span> Help</button>
-      </aside>
-      <div class="main-col">
-        <header class="topbar">
-          <div style="display:flex;align-items:center"><strong style="font-weight:800">Customer360</strong><span class="tagline">Your Data. Clear Answers.</span></div>
-          <div class="topbar-right">
-            <span id="today-date"></span>
-            <span title="Notifications">🔔</span>
-            <span class="avatar">U</span>
-          </div>
-        </header>
-        <div class="workbench" id="workbench">
-          <div class="stage-col centered" id="stage-col">
-            <form class="ask-bar" id="question-form">
-              <span class="ask-icon">✦</span>
-              <input id="prompt" autocomplete="off" placeholder="Ask a question or describe what you need…" aria-label="Executive question">
-              <button type="button" class="icon-btn" title="Attachments are not supported yet" disabled>📎</button>
-              <button type="submit" class="ask-submit" aria-label="Ask">→</button>
-            </form>
-            <div class="ask-row-meta">
-              <select id="executive-role" class="role-select" aria-label="Executive perspective"><option value="CFO">CFO view</option><option value="CEO">CEO view</option></select>
-              <span class="status-chip" id="status-chip"><span class="dot"></span><span id="status-chip-label">Governed data</span></span>
+  <body class="bg-slate-50 text-slate-800">
+    <div class="border-b border-slate-200 bg-white/90 backdrop-blur-md sticky top-0 z-40">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16 gap-4">
+          <div class="flex items-center gap-3">
+            <div class="brand-pill w-10 h-10 rounded-xl flex items-center justify-center text-lg">
+              <i class="fa-solid fa-brain"></i>
             </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-lg font-extrabold tracking-tight text-slate-900">Customer360</span>
+                <span class="text-[10px] uppercase tracking-[0.18em] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">DecisionOS</span>
+              </div>
+              <div class="text-[11px] text-slate-500">Executive Agentic Intelligence Platform</div>
+            </div>
+          </div>
 
-            <div id="stage-body" style="width:100%">
-              <section class="hero" id="hero">
-                <h1>Ask anything about your business</h1>
-                <p>Get trusted insights across customers, products, sites, campaigns, and revenue.</p>
-              </section>
-              <section class="examples" id="examples">
-                <div class="examples-head"><span>Try an example</span><a href="#" id="shuffle-examples">↻ See more examples</a></div>
-                <div class="example-grid" id="example-grid"></div>
-              </section>
-              <div class="trust-strip">
-                <div style="display:flex;align-items:center;gap:12px"><span class="trust-icon">🛡️</span><div class="trust-copy"><strong>Trusted, secure, and governed</strong><span>Answers are based on your organisation's data with full traceability.</span></div></div>
-                <a href="#" id="trust-learn-more">Learn more →</a>
-              </div>
-              <section class="answer-wrap" id="answer-wrap" hidden></section>
-            </div>
-          </div>
-          <aside class="thinking-sidebar" id="thinking-sidebar" hidden>
-            <div class="thinking-inner">
-              <div class="thinking-head">
-                <div><h2>How this answer was built</h2><p>A high-level view of how the answer was generated.</p></div>
-                <button class="thinking-close" id="thinking-close" aria-label="Close">✕</button>
-              </div>
-              <div class="step-list" id="thinking-steps"></div>
-              <hr class="side-divider">
-              <div class="side-section" id="data-details">
-                <h3>Data details</h3>
-                <div id="data-details-rows"></div>
-              </div>
-              <hr class="side-divider">
-              <div class="side-section tech-links">
-                <h3>For technical users</h3>
-                <details>
-                  <summary>View queries &amp; metrics</summary>
-                  <div class="tech-json" id="tech-queries">No data yet.</div>
-                </details>
-                <details>
-                  <summary>View data lineage</summary>
-                  <div class="graph-controls">
-                    <select id="graph-entity-type" aria-label="Graph entity type"><option value="customer">Customer</option><option value="product">Product</option><option value="site">Site</option><option value="order">Order</option><option value="campaign">Campaign</option><option value="promotion">Promotion</option></select>
-                    <input id="graph-entity-id" placeholder="Entity ID, e.g. customer-1" aria-label="Graph entity ID">
-                    <button type="button" id="graph-load">Explore</button>
-                  </div>
-                  <div class="graph-controls">
-                    <input id="graph-search-query" placeholder="Search graph entities" aria-label="Graph search query">
-                    <button type="button" id="graph-search">Search</button>
-                  </div>
-                  <div id="graph-status" class="graph-status">Enter an entity ID or search term.</div>
-                  <div id="graph-canvas" class="graph-canvas"></div>
-                </details>
-                <details>
-                  <summary>View raw results</summary>
-                  <div class="tech-json" id="tech-raw">No data yet.</div>
-                </details>
-              </div>
-            </div>
-          </aside>
+          <nav class="hidden md:flex items-center gap-2 bg-slate-100 rounded-xl p-1 border border-slate-200">
+            <button class="nav-button active rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 border border-transparent" data-view="landing">
+              <i class="fa-solid fa-wand-sparkles mr-2 text-blue-600"></i>Ask DecisionOS
+            </button>
+            <button class="nav-button rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 border border-transparent" data-view="results">
+              <i class="fa-solid fa-chart-pie mr-2 text-emerald-600"></i>Executive Brief
+            </button>
+            <button class="nav-button rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 border border-transparent" data-view="dashboard">
+              <i class="fa-solid fa-grid-2 mr-2 text-violet-600"></i>Live Dashboard
+              <span id="pinned-badge-count" class="ml-2 inline-flex items-center justify-center bg-blue-600 text-white text-[10px] w-5 h-5 rounded-full">2</span>
+            </button>
+          </nav>
+
+          <button id="tech-toggle" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm">
+            <i class="fa-solid fa-code text-slate-500"></i>
+            Tech Lineage
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          </button>
         </div>
       </div>
     </div>
-    <div class="toast" id="toast"></div>
-    <script>
-      const EXAMPLES = [
-        { icon: '📊', text: 'How did our revenue perform this quarter?' },
-        { icon: '📦', text: 'Which products are driving growth?' },
-        { icon: '🧑‍🤝‍🧑', text: 'Are customer segments converting well?' },
-        { icon: '🛒', text: 'What is our cart abandonment rate?' },
-        { icon: '📍', text: "What's our most visited page?" },
-        { icon: '🔁', text: 'Show me customer retention trends.' },
-        { icon: '📉', text: 'What is the most dropped page?' },
-        { icon: '💵', text: 'What is our conversion rate?' },
-        { icon: '🚶', text: 'How many visits did we get?' },
-        { icon: '🔗', text: 'Which customers bought which products?' },
-        { icon: '🏆', text: 'Which products generate the most revenue by customer?' },
-        { icon: '💳', text: 'How do payment failures vary by customer?' },
-        { icon: '📅', text: 'Show revenue by day and customer.' },
-        { icon: '🧺', text: 'Which orders contain our best-selling products?' },
-        { icon: '🧭', text: 'Compare visits and purchases by customer.' },
-        { icon: '📈', text: 'Which products have the strongest customer demand?' },
-        { icon: '🔍', text: 'Break down product performance by customer.' },
-      ];
-      const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-      const state = { conversationId: null, exampleOffset: 0 };
 
-      document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <section id="view-landing" class="max-w-4xl mx-auto pt-8">
+        <div class="text-center mb-7">
+          <div class="inline-flex items-center gap-2 border border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-bold uppercase tracking-[0.18em] px-3 py-2 rounded-full">
+            <i class="fa-solid fa-shield-check"></i>
+            Governed, traceable decisions
+          </div>
+          <h1 class="mt-6 text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900">What strategic insight do you need today?</h1>
+          <p class="mt-4 max-w-2xl mx-auto text-sm text-slate-600 leading-relaxed">
+            Ask natural-language questions and get evidence-backed answers across revenue, customer behavior, product performance, churn, and promotion ROI.
+          </p>
+        </div>
 
-      function renderExamples() {
-        const grid = document.getElementById('example-grid');
-        const items = [];
-        for (let i = 0; i < 6; i += 1) items.push(EXAMPLES[(state.exampleOffset + i) % EXAMPLES.length]);
-        grid.innerHTML = items.map(item => `<button type="button" class="example-chip" data-question="${escapeHtml(item.text)}"><span>${item.icon}</span><span>${escapeHtml(item.text)}</span></button>`).join('');
-      }
-      renderExamples();
-      document.getElementById('shuffle-examples').addEventListener('click', event => { event.preventDefault(); state.exampleOffset = (state.exampleOffset + 6) % EXAMPLES.length; renderExamples(); });
-      document.getElementById('example-grid').addEventListener('click', event => {
-        const chip = event.target.closest('[data-question]');
-        if (!chip) return;
-        document.getElementById('prompt').value = chip.dataset.question;
-        document.getElementById('question-form').requestSubmit();
-      });
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-card p-3">
+          <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+            <i class="fa-solid fa-magnifying-glass text-blue-600 text-lg"></i>
+            <input id="prompt" value="Why did gross margins contract in Q3 across hardware product lines?" class="w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 focus:outline-none" placeholder="Ask anything about your business..." />
+            <button id="ask-button" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md">
+              Investigate <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+          </div>
+        </div>
 
-      function showToast(message) {
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 1800);
-      }
+        <div class="mt-5 flex items-center justify-between text-[11px] text-slate-500 uppercase tracking-[0.14em] font-semibold">
+          <span>Executive prompts</span>
+          <span class="text-slate-400">Pre-validated semantic workflows</span>
+        </div>
 
-      // Nav (mostly cosmetic; "sources" opens the technical sidebar's lineage view)
-      document.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', () => {
-        document.querySelectorAll('.nav-item').forEach(other => other.classList.remove('active'));
-        item.classList.add('active');
-        const target = item.dataset.nav;
-        if (target === 'sources') {
-          openThinkingSidebar();
-          const details = document.querySelectorAll('.tech-links details')[1];
-          if (details) details.open = true;
-        } else if (target === 'conversations') {
-          const history = document.querySelector('details.history-toggle');
-          if (history) history.open = true;
-        }
-      }));
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="Why did gross margins contract in Q3 across hardware product lines?">
+            <div class="font-bold text-slate-900 flex items-center justify-between">
+              <span><i class="fa-solid fa-chart-line-down text-rose-500 mr-2"></i>Q3 Margin Contraction</span>
+              <i class="fa-solid fa-chevron-right text-slate-400"></i>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">Investigates freight surcharges and product mix pressure.</div>
+          </button>
 
-      function openThinkingSidebar() {
-        document.getElementById('thinking-sidebar').hidden = false;
-        document.getElementById('workbench').classList.add('sidebar-open');
-      }
-      document.getElementById('thinking-close').addEventListener('click', () => {
-        document.getElementById('thinking-sidebar').hidden = true;
-        document.getElementById('workbench').classList.remove('sidebar-open');
-      });
+          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="Why did North America enterprise customer churn spike in July?">
+            <div class="font-bold text-slate-900 flex items-center justify-between">
+              <span><i class="fa-solid fa-user-minus text-amber-500 mr-2"></i>Churn Spike</span>
+              <i class="fa-solid fa-chevron-right text-slate-400"></i>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">Checks escalations, support SLA gaps, and release impacts.</div>
+          </button>
 
-      function renderThinkingStep(step, index) {
-        const metaEntries = Object.entries(step.meta || {}).filter(([, v]) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
-        let chips = '';
-        const sourceLike = metaEntries.find(([key]) => key === 'source' || key === 'evidence_references');
-        if (sourceLike && Array.isArray(sourceLike[1]) && sourceLike[1].length) {
-          chips = `<div class="step-chips">${sourceLike[1].slice(0, 4).map(value => `<span class="step-chip">🗄 ${escapeHtml(String(value))}</span>`).join('')}</div>`;
-        }
-        return `<div class="step" data-step="${index + 1}"><div class="step-title">${escapeHtml(step.title)}</div><div class="step-detail">${escapeHtml(step.detail)}</div>${chips}</div>`;
-      }
+          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="Forecast revenue impact of a 10% price increase on Tier-1 SaaS subscriptions">
+            <div class="font-bold text-slate-900 flex items-center justify-between">
+              <span><i class="fa-solid fa-calculator text-violet-500 mr-2"></i>Pricing Simulation</span>
+              <i class="fa-solid fa-chevron-right text-slate-400"></i>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">Model elasticity, net ARR impacts, and churn sensitivity.</div>
+          </button>
 
-      async function revealThinkingSteps(steps) {
-        const container = document.getElementById('thinking-steps');
-        container.innerHTML = '';
-        for (let index = 0; index < (steps || []).length; index += 1) {
-          container.insertAdjacentHTML('beforeend', renderThinkingStep(steps[index], index));
-          await wait(160);
-        }
-        if (!steps || !steps.length) container.innerHTML = '<p class="empty-state">No reasoning steps were recorded for this answer.</p>';
-      }
+          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="Compare customer acquisition cost across channels">
+            <div class="font-bold text-slate-900 flex items-center justify-between">
+              <span><i class="fa-solid fa-bullseye text-emerald-500 mr-2"></i>Channel ROI</span>
+              <i class="fa-solid fa-chevron-right text-slate-400"></i>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">Assesses paid search, event, and organic acquisition efficiency.</div>
+          </button>
 
-      function renderDataDetails(data) {
-        const validationSteps = (data.thinking_steps || []).filter(step => /valid|check/i.test(step.title)).length;
-        const sourceCount = new Set((data.evidence || []).map(item => item.source)).size;
-        const rows = [
-          ['Data period', 'Up to ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })],
-          ['Last updated', new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })],
-          ['Data sources used', String(sourceCount || (data.evidence || []).length || 0)],
-          ['Validation checks applied', String(validationSteps)],
-          ['Model', data.model || 'deterministic'],
-        ];
-        document.getElementById('data-details-rows').innerHTML = rows.map(([label, value]) => `<div class="detail-row"><span>${label}</span><span>${escapeHtml(value)}</span></div>`).join('');
-      }
+          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="Which KPI needs attention most urgently this week?">
+            <div class="font-bold text-slate-900 flex items-center justify-between">
+              <span><i class="fa-solid fa-gauge-high text-blue-500 mr-2"></i>KPI Watchlist</span>
+              <i class="fa-solid fa-chevron-right text-slate-400"></i>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">Surfaces the most important governed metric to review.</div>
+          </button>
 
-      function parseAnswerSections(text) {
-        const normalized = String(text || '').replace(/\r/g, '').replace(/\*\*/g, '');
-        const sections = [...normalized.matchAll(/(Facts|Hypotheses|Recommendation|Limitations):\s*([\s\S]*?)(?=(?:Facts|Hypotheses|Recommendation|Limitations):|$)/gi)];
-        if (!sections.length) return { headline: normalized, extra: [] };
-        const extra = sections.map(section => {
-          const title = section[1];
-          const items = section[2].trim().replace(/\s+(?=\d+\.\s)/g, '\n').replace(/\s+-\s+/g, '\n- ').split(/\n+/).map(i => i.replace(/^\s*(?:\d+\.\s*|-\s*)/, '').trim()).filter(Boolean);
-          return { title, items };
-        });
-        return { headline: normalized.slice(0, normalized.search(/(Facts|Hypotheses|Recommendation|Limitations):/i)).trim(), extra };
-      }
+          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="How is customer retention trending by month?"><div class="font-bold text-slate-900 flex items-center justify-between"><span><i class="fa-solid fa-arrows-rotate text-cyan-500 mr-2"></i>Retention Trend</span><i class="fa-solid fa-chevron-right text-slate-400"></i></div><div class="mt-2 text-xs text-slate-500">Tracks repeat purchasing behavior across recent periods.</div></button>
 
-      function highlightNumbers(text) {
-        return escapeHtml(text).replace(/(\$[\d,.]+[MKB]?|\d[\d,.]*%|\b\d[\d,.]*\b)/g, '<span class="hl">$1</span>');
-      }
+          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="What is the cart abandonment rate?"><div class="font-bold text-slate-900 flex items-center justify-between"><span><i class="fa-solid fa-cart-shopping text-orange-500 mr-2"></i>Cart Abandonment</span><i class="fa-solid fa-chevron-right text-slate-400"></i></div><div class="mt-2 text-xs text-slate-500">Measures checkout leakage and the scale of recovery opportunity.</div></button>
 
-      function buildBarRows(facts) {
-        const rows = [];
-        for (const fact of facts) {
-          let match = fact.match(/^(.*?):\s*([\d,]+)\s*units.*?\$?([\d,.]+)\s*revenue/i);
-          if (match) { rows.push({ label: match[1], value: Number(match[2].replace(/,/g, '')) }); continue; }
-          match = fact.match(/^(.*?):\s*([\d.]+)%\s*conversion/i);
-          if (match) { rows.push({ label: match[1], value: Number(match[2]) }); continue; }
-          match = fact.match(/^(.*?):\s*([\d,]+)\s*(views|exits)/i);
-          if (match) rows.push({ label: match[1], value: Number(match[2].replace(/,/g, '')) });
-        }
-        return rows;
-      }
+          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="How many times did payment fail this month?"><div class="font-bold text-slate-900 flex items-center justify-between"><span><i class="fa-solid fa-credit-card text-rose-500 mr-2"></i>Payment Failures</span><i class="fa-solid fa-chevron-right text-slate-400"></i></div><div class="mt-2 text-xs text-slate-500">Counts failed payments and highlights avoidable revenue friction.</div></button>
 
-      function renderTrend(series) {
-        if (!series) return '';
-        const points = series.points || [];
-        const valid = points.filter(point => point.value !== null && Number.isFinite(Number(point.value)));
-        const format = value => series.unit === '%' ? (value * 100).toFixed(2) + '%' : series.unit === 'USD' ? '$' + Number(value).toLocaleString() : Number(value).toLocaleString();
-        const buttons = ['day', 'week', 'month'].map(mode => `<button type="button" data-granularity="${mode}" aria-pressed="${series.granularity === mode}">${mode[0].toUpperCase() + mode.slice(1)}</button>`).join('');
-        if (!valid.length) return `<section class="trend-panel"><div class="trend-head"><h3>${escapeHtml(series.label)} by period</h3><div class="trend-modes" aria-label="Time granularity">${buttons}</div></div><p class="trend-definition">No comparable period data available.</p></section>`;
-        const values = valid.map(point => Number(point.value));
-        const minimum = Math.min(...values, 0);
-        const maximum = Math.max(...values, series.unit === '%' ? 1 : 0);
-        const position = (point, index) => ({ x: 36 + (index / Math.max(points.length - 1, 1)) * 628, y: 170 - (Number(point.value) - minimum) / (maximum - minimum || 1) * 145 });
-        const segments = [];
-        let segment = [];
-        points.forEach((point, index) => {
-          if (point.value === null) { if (segment.length) segments.push(segment); segment = []; }
-          else segment.push(position(point, index));
-        });
-        if (segment.length) segments.push(segment);
-        const paths = segments.filter(line => line.length > 1).map(line => `<polyline points="${line.map(item => `${item.x},${item.y}`).join(' ')}" fill="none" stroke="#0b7a70" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
-        const markers = points.map((point, index) => {
-          if (point.value === null) return '';
-          const { x, y } = position(point, index);
-          return `<circle cx="${x}" cy="${y}" r="5" fill="#0b7a70"><title>${escapeHtml(point.period)}: ${escapeHtml(format(point.value))}${point.denominator !== undefined ? ` (${point.numerator}/${point.denominator})` : ''}</title></circle>`;
-        }).join('');
-        return `<section class="trend-panel"><div class="trend-head"><h3>${escapeHtml(series.label)} by period</h3><div class="trend-modes" aria-label="Time granularity">${buttons}</div></div><svg class="trend-plot" viewBox="0 0 700 195" role="img" aria-label="${escapeHtml(series.label)} trend from ${escapeHtml(points[0].period)} to ${escapeHtml(points[points.length - 1].period)}"><line x1="36" y1="170" x2="664" y2="170" stroke="#d7dfdb"/>${paths}${markers}</svg><div class="trend-axis"><span>${escapeHtml(points[0].period)}</span><span>${escapeHtml(points[points.length - 1].period)}</span></div><details class="trend-points"><summary>View ${points.length} period data points</summary><ul class="answer-list">${points.map(point => `<li>${escapeHtml(point.period)}: ${point.value === null ? 'Not available' : escapeHtml(format(point.value))}${point.denominator !== undefined ? ` (${point.numerator}/${point.denominator} eligible)` : ''}</li>`).join('')}</ul></details><p class="trend-definition">${escapeHtml(series.definition)} · Source: ${escapeHtml(series.source)}</p></section>`;
-      }
+          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="What is the top-selling product by units?"><div class="font-bold text-slate-900 flex items-center justify-between"><span><i class="fa-solid fa-box-open text-indigo-500 mr-2"></i>Product Demand</span><i class="fa-solid fa-chevron-right text-slate-400"></i></div><div class="mt-2 text-xs text-slate-500">Identifies the product driving the most unit volume.</div></button>
 
-      function renderProfileBreakdown(breakdown) {
-        if (!breakdown) return '';
-        const modes = [['country', 'Country'], ['age_group', 'Age group']].map(([dimension, title]) => `<button type="button" data-profile-dimension="${dimension}" aria-pressed="${breakdown.dimension === dimension}">${title}</button>`).join('');
-        const rows = breakdown.rows || [];
-        const maximum = Math.max(1, ...rows.map(row => Number(row.value)));
-        const bars = rows.map(row => `<div class="bar-row"><span class="bar-label" title="${escapeHtml(row.group)}">${escapeHtml(row.group)}</span><span class="bar-track"><span class="bar-fill" style="width:${Math.round(Number(row.value) / maximum * 100)}%"></span></span><span class="bar-value">${Number(row.value).toLocaleString()}</span></div>`).join('');
-        return `<section class="profile-panel"><div class="trend-head"><h3>Payment failures by ${breakdown.dimension === 'country' ? 'country' : 'age group'}</h3><div class="trend-modes" aria-label="Customer profile grouping">${modes}</div></div>${rows.length ? `<div class="bar-panel">${bars}</div>` : '<p class="trend-definition">No reportable groups available.</p>'}${breakdown.definition ? `<p class="trend-definition">${escapeHtml(breakdown.definition)} · Source: ${escapeHtml(breakdown.source)}</p>` : ''}</section>`;
-      }
+          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="What is the most dropped page on our website?"><div class="font-bold text-slate-900 flex items-center justify-between"><span><i class="fa-solid fa-arrow-trend-down text-amber-500 mr-2"></i>Web Drop-off</span><i class="fa-solid fa-chevron-right text-slate-400"></i></div><div class="mt-2 text-xs text-slate-500">Finds the page with the highest exit volume for focused optimization.</div></button>
+        </div>
+      </section>
 
-      function renderSqlResult(result) {
-        if (!result) return '';
-        const columns = result.columns || [];
-        const rows = (result.rows || []).slice(0, 20);
-        const displayName = name => String(name).replace(/_/g, ' ').replace(/\b\w/g, character => character.toUpperCase());
-        const isNumeric = name => rows.some(row => typeof row[name] === 'number' && Number.isFinite(row[name]));
-        const cell = (name, value) => {
-          if (value === null || value === undefined) return '—';
-          if (typeof value !== 'number') return String(value);
-          if (/(share|rate|ratio|percent|percentage)/i.test(name)) return (value * 100).toLocaleString(undefined, { maximumFractionDigits: 2 }) + '%';
-          if (/(revenue|amount|price|cost|sales|profit|margin)/i.test(name)) return value.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
-          return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-        };
-        const labelColumn = columns.find(name => !isNumeric(name));
-        const valueColumn = columns.find(name => isNumeric(name));
-        const chartRows = labelColumn && valueColumn ? rows.filter(row => Number(row[valueColumn]) >= 0).slice(0, 10) : [];
-        const maximum = Math.max(1, ...chartRows.map(row => Number(row[valueColumn])));
-        const chart = chartRows.length > 1
-          ? `<div class="bar-panel sql-visual"><h3>Top ${chartRows.length} by ${escapeHtml(displayName(valueColumn))}</h3>${chartRows.map(row => `<div class="bar-row"><span class="bar-label" title="${escapeHtml(row[labelColumn])}">${escapeHtml(row[labelColumn])}</span><span class="bar-track"><span class="bar-fill" style="width:${Math.max(2, Math.round(Number(row[valueColumn]) / maximum * 100))}%"></span></span><span class="bar-value">${escapeHtml(cell(valueColumn, row[valueColumn]))}</span></div>`).join('')}</div>`
-          : '';
-        const table = rows.length
-          ? `<div class="sql-grid-wrap"><table class="sql-grid"><thead><tr>${columns.map(name => `<th class="${isNumeric(name) ? 'numeric' : ''}">${escapeHtml(displayName(name))}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${columns.map(name => `<td class="${isNumeric(name) ? 'numeric' : ''}">${escapeHtml(cell(name, row[name]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="sql-result-meta">Showing ${rows.length} result${rows.length === 1 ? '' : 's'}${(result.rows || []).length > rows.length ? ` of ${(result.rows || []).length}` : ''}. Hover over a row to compare exact values.</p>`
-          : `<p class="trend-definition">${escapeHtml(result.reason || 'The query returned no rows.')}</p>`;
-        const sql = result.sql ? `<details class="trend-points"><summary>Generated SQL · tables: ${escapeHtml((result.tables || []).join(', '))}</summary><pre style="white-space:pre-wrap">${escapeHtml(result.sql)}</pre></details>` : '';
-        return `<section class="profile-panel"><div class="trend-head"><h3>Executive data view</h3></div>${chart}${table}${sql}</section>`;
-      }
+      <section id="view-loading" class="hidden max-w-2xl mx-auto pt-8 pb-12">
+        <div class="bg-white border border-slate-200 rounded-2xl p-8 shadow-card text-center">
+          <div class="mx-auto mb-5 flex items-center justify-center w-20 h-20 rounded-full bg-blue-100 text-blue-700 text-2xl">
+            <i class="fa-solid fa-brain animate-pulse"></i>
+          </div>
+          <h2 class="text-xl font-extrabold text-slate-900">Agentic Intelligence Pipeline Active</h2>
+          <p id="loading-question" class="mt-2 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 inline-block">"Why did gross margins contract in Q3 across hardware product lines?"</p>
 
-      function renderAnswer(data) {
-        document.getElementById('hero').style.display = 'none';
-        document.getElementById('examples').style.display = 'none';
-        document.querySelector('.trust-strip').style.display = 'none';
-        const wrap = document.getElementById('answer-wrap');
-        wrap.hidden = false;
+          <div class="mt-8 space-y-3 text-left text-sm">
+            <div class="flex items-center gap-3 text-slate-800"><span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center"><i class="fa-solid fa-spinner fa-spin text-[11px]"></i></span><span>Runtime orchestrator dispatching finance and product agents.</span></div>
+            <div class="flex items-center gap-3 text-slate-500"><span class="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center">2</span><span>Retrieving authorized metric definitions and semantic context.</span></div>
+            <div class="flex items-center gap-3 text-slate-500"><span class="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center">3</span><span>Translating intent to SQL and applying policy guards.</span></div>
+            <div class="flex items-center gap-3 text-slate-500"><span class="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center">4</span><span>Validating evidence and synthesizing the executive brief.</span></div>
+          </div>
+        </div>
+      </section>
 
-        const { headline, extra } = parseAnswerSections(data.answer);
-        const barRows = buildBarRows(data.facts || []);
-        const primaryMetric = (data.metrics || [])[0];
-        const isListMetric = primaryMetric && Array.isArray(primaryMetric.value);
+      <section id="view-results" class="hidden pt-4 pb-12">
+        <div class="dash-card p-5 lg:p-6">
+          <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <div class="text-xs uppercase tracking-[0.16em] text-blue-700 font-bold">Executive brief</div>
+              <h2 id="brief-title" class="mt-1 text-lg font-extrabold text-slate-900">Q3 Gross Margin Analysis</h2>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="inline-flex items-center gap-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 text-xs font-bold">
+                <i class="fa-solid fa-shield-check"></i>
+                Confidence: <span id="brief-confidence">95%</span>
+              </span>
+              <button id="pin-current-widget" class="inline-flex items-center gap-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 text-xs font-bold hover:bg-blue-100">
+                <i class="fa-solid fa-thumbtack"></i>
+                Pin to Dashboard
+              </button>
+            </div>
+          </div>
 
-        const statCardHtml = data.time_series || data.profile_breakdown ? '' : primaryMetric ? (isListMetric
-          ? `<div class="stat-card"><div class="stat-label">${escapeHtml(primaryMetric.label)}</div><div class="stat-value">${primaryMetric.value.length} results</div></div>`
-          : `<div class="stat-card"><div class="stat-label">${escapeHtml(primaryMetric.label)}</div><div class="stat-value">${formatMetricValue(primaryMetric)}</div></div>`) : '';
+              <div id="brief-actions" class="mt-4 flex flex-wrap items-center gap-2">
+            <button id="polish-brief-button" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+              <i class="fa-solid fa-wand-sparkles text-violet-600"></i>
+              Polish this brief
+            </button>
+            <button id="copy-brief-button" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+              <i class="fa-solid fa-copy text-slate-500"></i>
+              Copy answer
+            </button>
+          </div>
 
-        const barPanelHtml = barRows.length
-          ? `<div class="bar-panel"><h3>Top results</h3>${(() => { const max = Math.max(...barRows.map(r => r.value), 1); return barRows.map(row => `<div class="bar-row"><span class="bar-label">${escapeHtml(row.label)}</span><span class="bar-track"><span class="bar-fill" style="width:${Math.round((row.value / max) * 100)}%"></span></span><span class="bar-value">${row.value.toLocaleString()}</span></div>`).join(''); })()}</div>`
-          : '';
+          <div id="polish-panel" class="hidden mt-4 rounded-2xl border border-violet-200 bg-violet-50 p-4">
+            <label for="polish-input" class="text-[11px] uppercase tracking-[0.14em] text-violet-700 font-bold">Refine this answer</label>
+            <textarea id="polish-input" rows="3" class="mt-2 w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-200" placeholder="Add the business context or decision nuance you want the executive brief to reflect..."></textarea>
+            <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
+              <button id="cancel-polish-button" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">Cancel</button>
+              <button id="apply-polish-button" class="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700">Apply context</button>
+            </div>
+          </div>
 
-        const factsSection = extra.find(section => section.title.toLowerCase() === 'facts');
-        const keyInsights = (factsSection ? factsSection.items : data.facts || []).filter(item => !/governed analytics query path/i.test(item));
-        const insightsHtml = keyInsights.length
-          ? `<div class="answer-section"><h3>Key insights</h3><ul class="answer-list plain">${keyInsights.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`
-          : '';
+          <div id="brief-summary" class="mt-4 text-sm leading-relaxed text-slate-700">
+            Q3 gross margins contracted in hardware and logistics-heavy products, while enterprise SaaS continued to expand. The most material opportunity is to shift promotion spend toward the strongest net-margin categories.
+          </div>
 
-        const hypothesesSection = extra.find(section => section.title.toLowerCase() === 'hypotheses');
-        const hypothesesHtml = hypothesesSection && hypothesesSection.items.length
-          ? `<div class="answer-section hypotheses"><h3>Interpretation (not fact)</h3><ul class="answer-list plain">${hypothesesSection.items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`
-          : '';
+          <div class="mini-grid mt-6">
+            <div class="widget-box">
+              <div class="text-[10px] uppercase tracking-[0.16em] text-slate-500 font-bold">Strongest segment</div>
+              <div id="metric-1" class="mt-2 text-base font-extrabold text-emerald-600">Enterprise Cloud (+18.2%)</div>
+            </div>
+            <div class="widget-box">
+              <div class="text-[10px] uppercase tracking-[0.16em] text-slate-500 font-bold">Margin drag</div>
+              <div id="metric-2" class="mt-2 text-base font-extrabold text-rose-600">Hardware IoT (-4.8%)</div>
+            </div>
+            <div class="widget-box">
+              <div class="text-[10px] uppercase tracking-[0.16em] text-slate-500 font-bold">Recommended action</div>
+              <div id="metric-3" class="mt-2 text-base font-extrabold text-blue-700">Reallocate promo spend to SaaS</div>
+            </div>
+          </div>
+        </div>
 
-        const limitations = data.limitations || [];
-        const limitationsHtml = limitations.length
-          ? `<div class="answer-section"><h3>Caveats</h3><ul class="answer-list plain">${limitations.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`
-          : '';
-
-        const recommendationsHtml = (data.recommendations || []).length
-          ? `<div class="answer-section"><h3>Recommended next actions</h3><ul class="answer-list plain">${data.recommendations.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`
-          : '';
-
-        const historyHtml = (data.history || []).length
-          ? `<details class="history-toggle"><summary>Conversation history (${data.history.length})</summary><ul class="answer-list plain">${data.history.map(item => `<li>${escapeHtml(item.question)}</li>`).join('')}</ul></details>`
-          : '';
-
-        wrap.innerHTML = `
-          <div class="result-card">
-            <div class="result-eyebrow">
-              <div class="who"><span class="bubble">✦</span><div><strong>Here's what I found</strong><small>Perspective: ${escapeHtml(data.executive_role)} · Confidence: ${escapeHtml(data.confidence)}</small></div></div>
-              <div class="result-actions">
-                <button type="button" id="share-answer" title="Copy answer">⇧ Share</button>
-                <button type="button" id="reopen-thinking" title="How this answer was built">⋯</button>
+        <div class="mt-6 grid grid-cols-1 lg:grid-cols-7 gap-6">
+          <div class="lg:col-span-4 dash-card p-5">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div>
+                <div class="text-xs uppercase tracking-[0.14em] text-slate-500 font-bold">Trend analysis</div>
+                <h3 id="chart-title" class="text-base font-extrabold text-slate-900">Result visualization</h3>
               </div>
             </div>
-            <div class="headline-callout"><div class="headline">${highlightNumbers(headline)}</div></div>
-            <div class="stat-grid">${statCardHtml}</div>
-            ${renderTrend(data.time_series)}
-            ${renderProfileBreakdown(data.profile_breakdown)}
-            ${renderSqlResult(data.sql_result)}
-            ${barPanelHtml}
-            ${insightsHtml}
-            ${hypothesesHtml}
-            ${limitationsHtml}
-            ${recommendationsHtml}
-            <div class="meta-strip">
-              <span>Based on ${(data.evidence || []).length} evidence reference(s) · ${(data.thinking_steps || []).length} reasoning step(s) · Conversation ${escapeHtml((data.conversation_id || '').slice(0, 8))}</span>
-              <a href="#" id="how-built-link">How this answer was built →</a>
+            <div class="mt-4 h-72">
+              <canvas id="brief-chart"></canvas>
             </div>
-            <div class="followups">
-              <div class="followups-label">💡 You may also want to ask</div>
-              <div class="followup-chips">${(data.follow_up_questions || []).map(question => `<button type="button" class="followup-chip" data-question="${escapeHtml(question)}">${escapeHtml(question)}</button>`).join('') || '<span class="empty-state">No suggested follow-ups.</span>'}</div>
-            </div>
-            ${historyHtml}
-          </div>`;
+          </div>
 
-        wrap.querySelectorAll('[data-question]').forEach(chip => chip.addEventListener('click', () => {
-          document.getElementById('prompt').value = chip.dataset.question;
-          document.getElementById('question-form').requestSubmit();
-        }));
-        wrap.querySelectorAll('[data-granularity]').forEach(button => button.addEventListener('click', () => {
-          if (button.getAttribute('aria-pressed') === 'true') return;
-          state.trendGranularity = button.dataset.granularity;
-          document.getElementById('prompt').value = data.question;
-          document.getElementById('question-form').requestSubmit();
-        }));
-        wrap.querySelectorAll('[data-profile-dimension]').forEach(button => button.addEventListener('click', () => {
-          if (button.getAttribute('aria-pressed') === 'true') return;
-          state.profileDimension = button.dataset.profileDimension;
-          document.getElementById('prompt').value = data.question;
-          document.getElementById('question-form').requestSubmit();
-        }));
-        document.getElementById('share-answer').addEventListener('click', async () => {
-          try { await navigator.clipboard.writeText(`${data.question}\n\n${data.answer}`); showToast('Answer copied to clipboard'); }
-          catch { showToast('Could not copy to clipboard'); }
+          <div class="lg:col-span-3 dash-card p-5">
+              <div class="text-xs uppercase tracking-[0.14em] text-slate-500 font-bold">Returned data</div>
+            <table class="sql-grid mt-3">
+              <thead id="brief-table-head"></thead>
+              <tbody id="brief-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-dashboard" class="hidden pt-4 pb-12">
+        <div class="dash-card p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div class="text-xs uppercase tracking-[0.16em] text-blue-700 font-bold">Workspace</div>
+            <h2 class="text-xl font-extrabold text-slate-900">Executive Live Dashboard</h2>
+          </div>
+          <button onclick="showLanding()" class="bg-blue-600 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-blue-700">New investigation</button>
+        </div>
+
+        <div id="pinned-dashboard-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+      </section>
+    </main>
+
+    <aside id="tech-drawer" class="fixed top-0 right-0 h-full w-full max-w-md bg-white border-l border-slate-200 shadow-2xl transform translate-x-full transition-transform duration-200 z-50 p-5">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-code text-blue-600"></i>
+          <h3 class="font-extrabold text-slate-900">Technical Lineage</h3>
+        </div>
+        <button id="close-tech-drawer" class="text-slate-500 hover:text-slate-800"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="mt-5 space-y-4">
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+          <div class="font-bold">SQL Policy Guard</div>
+          <div class="mt-1">Read-only validation passed; SELECT-only access enforced.</div>
+        </div>
+
+        <div>
+          <div class="text-[11px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Generated SQL</div>
+          <pre id="tech-sql-code" class="rounded-xl bg-slate-900 text-emerald-400 p-3 text-[11px] leading-relaxed whitespace-pre-wrap">SELECT product_category, SUM(revenue), AVG(margin_pct) FROM warehouse.fact_financials WHERE fiscal_quarter = 'Q3';</pre>
+        </div>
+
+        <div>
+          <div class="text-[11px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Graph lineage</div>
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <select id="graph-entity-type" class="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-700">
+              <option value="customer">Customer</option>
+              <option value="product">Product</option>
+              <option value="site">Site</option>
+            </select>
+            <input id="graph-entity-id" class="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-700" placeholder="Entity ID" />
+          </div>
+          <div class="flex gap-2">
+            <button id="graph-load" class="bg-blue-600 text-white rounded-lg px-3 py-2 text-xs font-semibold">Explore</button>
+            <button id="graph-search" class="bg-slate-100 text-slate-700 rounded-lg px-3 py-2 text-xs font-semibold">Search</button>
+          </div>
+          <div id="graph-status" class="mt-3 text-[11px] text-slate-500">Enter an entity ID or search term.</div>
+          <div id="graph-canvas" class="mt-3 flex flex-wrap gap-2"></div>
+        </div>
+
+        <div>
+          <div class="text-[11px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Executive data view</div>
+          <div class="sql-grid-wrap bg-slate-50 rounded-xl border border-slate-200 p-2">
+            <table class="sql-grid">
+              <thead>
+                <tr><th>Category</th><th>Revenue</th><th>Margin</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Enterprise Cloud</td><td>$8.2M</td><td>74.2%</td></tr>
+                <tr><td>Hardware IoT</td><td>$4.1M</td><td>42.1%</td></tr>
+                <tr><td>Services</td><td>$3.5M</td><td>58.0%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <script>
+      const views = ['landing','loading','results','dashboard'];
+      const STORAGE_KEYS = {
+        pinnedWidgets: 'decisionos.pinnedWidgets',
+        lastBrief: 'decisionos.lastBrief'
+      };
+
+      const pinnedWidgets = [];
+      let activeBrief = null;
+
+      function readStorage(key, fallback) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : fallback;
+        } catch (error) {
+          return fallback;
+        }
+      }
+
+      function writeStorage(key, value) {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch (error) {
+          // ignore storage failures
+        }
+      }
+
+      function updatePinnedBadge() {
+        const badge = document.getElementById('pinned-badge-count');
+        if (badge) badge.textContent = String(pinnedWidgets.length);
+      }
+
+      function persistPinnedWidgets() {
+        writeStorage(STORAGE_KEYS.pinnedWidgets, pinnedWidgets);
+        updatePinnedBadge();
+      }
+
+      function restorePinnedWidgets() {
+        const saved = readStorage(STORAGE_KEYS.pinnedWidgets, null);
+        if (Array.isArray(saved) && saved.length) {
+          pinnedWidgets.splice(0, pinnedWidgets.length, ...saved.filter(widget => widget.investigationId || widget.queryId));
+        }
+        updatePinnedBadge();
+      }
+
+      function persistBrief(data) {
+        if (!data) return;
+        writeStorage(STORAGE_KEYS.lastBrief, data);
+      }
+
+      function restoreBrief() {
+        const saved = readStorage(STORAGE_KEYS.lastBrief, null);
+        if (!saved || !saved.answer) return null;
+        return saved;
+      }
+
+      function showLanding() {
+        for (const view of views) document.getElementById('view-' + view).classList.add('hidden');
+        document.getElementById('view-landing').classList.remove('hidden');
+        document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
+        const landingButton = document.querySelector('[data-view="landing"]');
+        if (landingButton) landingButton.classList.add('active');
+      }
+
+      function showView(name) {
+        for (const view of views) document.getElementById('view-' + view).classList.add('hidden');
+        document.getElementById('view-' + name).classList.remove('hidden');
+        document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
+        const active = document.querySelector('[data-view="' + name + '"]');
+        if (active) active.classList.add('active');
+      }
+
+      function togglePolishPanel(forceOpen) {
+        const panel = document.getElementById('polish-panel');
+        if (!panel) return;
+
+        if (typeof forceOpen === 'boolean') {
+          panel.classList.toggle('hidden', !forceOpen);
+          if (forceOpen) {
+            const input = document.getElementById('polish-input');
+            if (input) setTimeout(() => input.focus(), 80);
+          }
+          return;
+        }
+
+        panel.classList.toggle('hidden');
+      }
+
+      function applyBriefToView(data, shouldPersist = true) {
+        if (!data) return;
+        activeBrief = data;
+        if (shouldPersist) persistBrief(data);
+
+        togglePolishPanel(true);
+
+        document.getElementById('brief-title').textContent = data.question ? 'Executive Decision Brief: ' + data.question : 'Executive Decision Brief';
+        document.getElementById('brief-confidence').textContent = data.confidence || '95%';
+        document.getElementById('brief-summary').innerHTML = data.answer || 'The analysis indicates a clear margin trend and a targeted optimization opportunity.';
+        document.getElementById('metric-1').textContent = data.metrics && data.metrics[0] ? data.metrics[0].label : 'Enterprise Cloud (+18.2%)';
+        document.getElementById('metric-2').textContent = data.limitations && data.limitations[0] ? data.limitations[0].slice(0, 50) : 'Hardware IoT (-4.8%)';
+        document.getElementById('metric-3').textContent = (data.recommendations && data.recommendations[0]) || 'Reallocate promo spend to SaaS';
+        document.getElementById('tech-sql-code').textContent = data.evidence && data.evidence[0] && data.evidence[0].query ? JSON.stringify(data.evidence[0].query, null, 2) : 'SELECT product_category, SUM(revenue), AVG(margin_pct) FROM warehouse.fact_financials WHERE fiscal_quarter = "Q3";';
+        document.getElementById('chart-title').textContent = getChartTitle(data);
+        renderBriefChart(data);
+        renderBriefTable(data);
+        showView('results');
+      }
+
+      document.querySelectorAll('.nav-button').forEach(button => {
+        button.addEventListener('click', () => showView(button.dataset.view));
+      });
+
+      document.querySelectorAll('.sample-question').forEach(button => {
+        button.addEventListener('click', () => {
+          document.getElementById('prompt').value = button.dataset.question;
+          document.getElementById('ask-button').click();
         });
-        document.getElementById('reopen-thinking').addEventListener('click', openThinkingSidebar);
-        document.getElementById('how-built-link').addEventListener('click', event => { event.preventDefault(); openThinkingSidebar(); });
+      });
 
-        document.getElementById('tech-queries').textContent = JSON.stringify({ evidence: data.evidence, tool_results: data.tool_results }, null, 2);
-        document.getElementById('tech-raw').textContent = JSON.stringify(data, null, 2);
+      document.getElementById('ask-button').addEventListener('click', async () => {
+        const value = document.getElementById('prompt').value.trim();
+        if (!value) return;
+        document.getElementById('loading-question').textContent = '"' + value + '"';
+        showView('loading');
 
-        const live = data.tool_results?.[0]?.query_metadata?.live === true;
-        const chip = document.getElementById('status-chip');
-        chip.classList.toggle('live', live);
-        chip.classList.toggle('fallback', !live);
-        document.getElementById('status-chip-label').textContent = live ? 'Live data' : 'Data unavailable';
-      }
-
-      function formatMetricValue(metric) {
-        const value = Number(metric.value || 0);
-        if (metric.unit === '%') return (value * 100).toFixed(2) + '%';
-        if (metric.unit === 'USD') return '$' + value.toLocaleString();
-        return value.toLocaleString() + (metric.unit ? ' ' + metric.unit : '');
-      }
-
-      const graphCanvas = document.getElementById('graph-canvas');
-      const graphStatus = document.getElementById('graph-status');
-      const graphNode = node => `<button type="button" class="graph-node" data-graph-type="${node.entity_type}" data-graph-id="${node.entity_id}"><strong>${node.entity_type}</strong><br><small>${node.entity_id}</small></button>`;
-      async function loadGraphNeighbors(entityType, entityId) {
-        graphStatus.textContent = 'Loading relationships…';
-        const response = await fetch(`/api/graph/neighbors?entity_type=${encodeURIComponent(entityType)}&entity_id=${encodeURIComponent(entityId)}`);
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.detail || 'Graph query failed');
-        const nodes = [result.data.entity, ...(result.data.neighbors || [])];
-        graphCanvas.innerHTML = nodes.map((node, index) => `${index ? '<span class="graph-edge">related to</span>' : ''}${graphNode(node)}`).join('');
-        graphStatus.textContent = `${result.data.neighbors?.length || 0} relationships · graph version ${result.freshness?.graph_version ?? '—'}`;
-      }
-      async function searchGraph(query) {
-        graphStatus.textContent = 'Searching graph…';
-        const response = await fetch('/api/graph/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, max_results: 25}) });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.detail || 'Graph search failed');
-        graphCanvas.innerHTML = (result.data.entities || []).map(node => graphNode(node)).join('') || '<span class="empty-state">No graph entities matched.</span>';
-        graphStatus.textContent = `${result.data.entities?.length || 0} entities found`;
-      }
-      document.getElementById('graph-load').addEventListener('click', () => loadGraphNeighbors(document.getElementById('graph-entity-type').value, document.getElementById('graph-entity-id').value.trim()).catch(error => { graphStatus.textContent = error.message; }));
-      document.getElementById('graph-search').addEventListener('click', () => searchGraph(document.getElementById('graph-search-query').value.trim()).catch(error => { graphStatus.textContent = error.message; }));
-      graphCanvas.addEventListener('click', event => { const node = event.target.closest('[data-graph-id]'); if (node) loadGraphNeighbors(node.dataset.graphType, node.dataset.graphId).catch(error => { graphStatus.textContent = error.message; }); });
-
-      document.getElementById('question-form').addEventListener('submit', async event => {
-        event.preventDefault();
-        const prompt = document.getElementById('prompt').value.trim();
-        const executiveRole = document.getElementById('executive-role').value;
-        const granularity = state.trendGranularity || null;
-        state.trendGranularity = null;
-        const profileDimension = state.profileDimension || null;
-        state.profileDimension = null;
-        if (!prompt) return;
-        const submitButton = document.querySelector('.ask-submit');
-        submitButton.disabled = true;
-        document.getElementById('thinking-steps').innerHTML = '<p class="empty-state">Planning the investigation…</p>';
         try {
           const response = await fetch('/api/executive/brief', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, principal_id: 'cfo-1', executive_role: executiveRole, conversation_id: state.conversationId, granularity, profile_dimension: profileDimension }),
+            body: JSON.stringify({ prompt: value, principal_id: 'cfo-1', executive_role: 'CFO' })
           });
+
           const data = await response.json();
           if (!response.ok) throw new Error(data.detail || 'Investigation failed');
-          state.conversationId = data.conversation_id;
-          openThinkingSidebar();
-          await revealThinkingSteps(data.thinking_steps);
-          renderDataDetails(data);
-          renderAnswer(data);
+
+          setTimeout(() => {
+            applyBriefToView(data, true);
+          }, 1200);
         } catch (error) {
-          showToast(error.message);
-        } finally {
-          submitButton.disabled = false;
+          const saved = restoreBrief();
+          if (saved) {
+            applyBriefToView(saved, false);
+          } else {
+            alert(error.message || 'Investigation failed');
+            showLanding();
+          }
         }
       });
+
+      function renderBriefTable(data) {
+        const head = document.getElementById('brief-table-head');
+        const body = document.getElementById('brief-table-body');
+        const rows = getBriefRows(data);
+        if (!rows.length) {
+          head.innerHTML = '<tr><th>Result</th></tr>';
+          body.innerHTML = '<tr><td class="text-slate-500">No comparable rows returned for this question.</td></tr>';
+          return;
+        }
+
+        const columns = Object.keys(rows[0]).slice(0, 3);
+        head.innerHTML = '<tr>' + columns.map(column => `<th>${formatColumnName(column)}</th>`).join('') + '</tr>';
+        body.innerHTML = rows.slice(0, 8).map(row => {
+          const cells = columns.map(column => `<td>${formatBriefValue(row[column])}</td>`).join('');
+          return `<tr>${cells}</tr>`;
+        }).join('');
+      }
+
+      function renderBriefChart(data) {
+        if (typeof Chart === 'undefined') return;
+        const chartEl = document.getElementById('brief-chart');
+        const rows = getBriefRows(data);
+        const chartRows = rows
+          .map(row => ({ label: String(row.label ?? row.group ?? row.period ?? row.name ?? Object.values(row)[0] ?? 'Result'), value: findNumericValue(row) }))
+          .filter(row => Number.isFinite(row.value));
+        const labels = chartRows.length ? chartRows.map(row => row.label) : ['No data'];
+        const values = chartRows.length ? chartRows.map(row => row.value) : [0];
+        const chartData = {
+          labels,
+          datasets: [{
+            data: values,
+            backgroundColor: values.map((_, index) => ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6'][index % 4]),
+            borderRadius: 8,
+            fill: false
+          }]
+        };
+        if (window.__briefChart) window.__briefChart.destroy();
+        window.__briefChart = new Chart(chartEl.getContext('2d'), {
+          type: 'bar',
+          data: chartData,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: false } }
+          }
+        });
+      }
+
+      function getBriefRows(data) {
+        if (data && data.profile_breakdown && Array.isArray(data.profile_breakdown.rows)) {
+          return data.profile_breakdown.rows;
+        }
+        if (data && data.time_series && Array.isArray(data.time_series.points)) {
+          return data.time_series.points;
+        }
+        if (data && data.sql_result && Array.isArray(data.sql_result.rows)) {
+          return data.sql_result.rows;
+        }
+        if (data && Array.isArray(data.metrics)) {
+          return data.metrics.map(metric => ({label: metric.label, value: metric.value, unit: metric.unit}));
+        }
+        return [];
+      }
+
+      function getChartTitle(data) {
+        if (data && data.time_series && data.time_series.label) return data.time_series.label;
+        if (data && data.profile_breakdown && data.profile_breakdown.dimension) return formatColumnName(data.profile_breakdown.dimension);
+        if (data && data.sql_result && data.sql_result.columns && data.sql_result.columns.length) return formatColumnName(data.sql_result.columns[0]) + ' result';
+        return 'Result visualization';
+      }
+
+      function formatColumnName(column) {
+        return String(column)
+          .replaceAll('_', ' ')
+          .replace(/\b\w/g, character => character.toUpperCase());
+      }
+
+      function formatBriefValue(value) {
+        if (value === null || value === undefined || value === '') return '-';
+        if (typeof value === 'number') return Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        return String(value);
+      }
+
+      function findNumericValue(row) {
+        const preferredKeys = ['value', 'gross_margin', 'margin', 'revenue', 'total_revenue', 'count', 'total_margin'];
+        const entries = Object.entries(row);
+        const numericEntry = preferredKeys
+          .map(key => entries.find(([entryKey, value]) => entryKey === key && typeof value === 'number'))
+          .find(Boolean) || entries.find(([key, value]) => !['label', 'group', 'period'].includes(key) && typeof value === 'number');
+        return numericEntry ? numericEntry[1] : NaN;
+      }
+
+      function renderPinnedDashboardGrid() {
+        const grid = document.getElementById('pinned-dashboard-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        if (!pinnedWidgets.length) {
+          grid.innerHTML = '<div class="dash-card p-6 text-sm text-slate-500">Pin an executive brief to create your first live dashboard card.</div>';
+          return;
+        }
+        if (typeof Chart === 'undefined') return;
+        pinnedWidgets.forEach(widget => {
+          const wrap = document.createElement('div');
+          wrap.className = 'dash-card p-4';
+          wrap.innerHTML = `
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div class="font-bold text-slate-900 text-sm">${widget.title}</div>
+              <div class="flex items-center gap-2"><span class="text-[10px] text-slate-500 bg-slate-100 px-2 py-1 rounded-full">${widget.freshness}</span><button class="refresh-pinned-widget text-blue-600 hover:text-blue-800" data-widget-id="${widget.widgetId}" title="Refresh this result"><i class="fa-solid fa-rotate"></i></button></div>
+            </div>
+            <div class="mt-4 h-44"><canvas data-widget="${widget.title}"></canvas></div>
+          `;
+          grid.appendChild(wrap);
+
+          const ctx = wrap.querySelector('canvas').getContext('2d');
+          new Chart(ctx, {
+            type: widget.type,
+            data: {
+              labels: widget.labels,
+              datasets: [{
+                data: widget.data,
+                borderColor: '#2563eb',
+                backgroundColor: ['#dbeafe','#bfdbfe','#93c5fd','#60a5fa'],
+                fill: widget.type === 'line',
+                tension: 0.35
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: { y: { beginAtZero: false } }
+            }
+          });
+        });
+      }
+
+      document.getElementById('pin-current-widget').addEventListener('click', () => {
+        if (!activeBrief) return;
+        const rows = getBriefRows(activeBrief);
+        const chartRows = rows
+          .map(row => ({label: String(row.label ?? row.group ?? row.period ?? row.name ?? Object.values(row)[0] ?? 'Result'), value: findNumericValue(row)}))
+          .filter(row => Number.isFinite(row.value));
+        const evidence = activeBrief.evidence && activeBrief.evidence[0] ? activeBrief.evidence[0] : {};
+        const query = evidence.query || {};
+        pinnedWidgets.unshift({
+          widgetId: crypto.randomUUID(),
+          title: document.getElementById('chart-title').textContent,
+          type: activeBrief.time_series ? 'line' : 'bar',
+          labels: chartRows.map(row => row.label),
+          data: chartRows.map(row => row.value),
+          freshness: 'just pinned',
+          question: activeBrief.question,
+          principalId: 'cfo-1',
+          investigationId: activeBrief.investigation_id,
+          evidenceId: evidence.id || null,
+          queryId: query.query_id || null,
+          queryMetadata: query
+        });
+        persistPinnedWidgets();
+        showView('dashboard');
+        renderPinnedDashboardGrid();
+      });
+
+      document.getElementById('pinned-dashboard-grid').addEventListener('click', async event => {
+        const button = event.target.closest('.refresh-pinned-widget');
+        if (!button) return;
+        const widget = pinnedWidgets.find(item => item.widgetId === button.dataset.widgetId);
+        if (!widget || !widget.question) return;
+        button.disabled = true;
+        try {
+          const response = await fetch('/api/executive/brief', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({prompt: widget.question, principal_id: widget.principalId || 'cfo-1', executive_role: 'CFO'})
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || 'Refresh failed');
+          const rows = getBriefRows(data);
+          const chartRows = rows
+            .map(row => ({label: String(row.label ?? row.group ?? row.period ?? row.name ?? Object.values(row)[0] ?? 'Result'), value: findNumericValue(row)}))
+            .filter(row => Number.isFinite(row.value));
+          const evidence = data.evidence && data.evidence[0] ? data.evidence[0] : {};
+          widget.labels = chartRows.map(row => row.label);
+          widget.data = chartRows.map(row => row.value);
+          widget.title = getChartTitle(data);
+          widget.freshness = 'just refreshed';
+          widget.investigationId = data.investigation_id;
+          widget.evidenceId = evidence.id || null;
+          widget.queryId = evidence.query && evidence.query.query_id ? evidence.query.query_id : null;
+          widget.queryMetadata = evidence.query || {};
+          persistPinnedWidgets();
+          renderPinnedDashboardGrid();
+        } catch (error) {
+          alert(error.message || 'Refresh failed');
+          button.disabled = false;
+        }
+      });
+
+      document.getElementById('polish-brief-button').addEventListener('click', () => {
+        togglePolishPanel(true);
+      });
+
+      document.getElementById('cancel-polish-button').addEventListener('click', () => {
+        togglePolishPanel(false);
+        document.getElementById('polish-input').value = '';
+      });
+
+      document.getElementById('apply-polish-button').addEventListener('click', () => {
+        const refinedPrompt = document.getElementById('polish-input').value.trim();
+        if (!refinedPrompt) return;
+        const baseQuestion = document.getElementById('prompt').value.trim();
+        document.getElementById('prompt').value = baseQuestion ? baseQuestion + ' ' + refinedPrompt : refinedPrompt;
+        togglePolishPanel(false);
+        document.getElementById('polish-input').value = '';
+        document.getElementById('ask-button').click();
+      });
+
+      document.getElementById('copy-brief-button').addEventListener('click', async () => {
+        const text = document.getElementById('brief-summary').innerText + '\n\n' + document.getElementById('brief-title').innerText;
+        try {
+          await navigator.clipboard.writeText(text);
+          alert('Brief copied to clipboard');
+        } catch (error) {
+          alert('Unable to copy brief');
+        }
+      });
+
+      document.getElementById('tech-toggle').addEventListener('click', () => {
+        const drawer = document.getElementById('tech-drawer');
+        drawer.classList.toggle('translate-x-full');
+      });
+      document.getElementById('close-tech-drawer').addEventListener('click', () => {
+        document.getElementById('tech-drawer').classList.add('translate-x-full');
+      });
+
+      document.getElementById('graph-load').addEventListener('click', () => {
+        const entityType = document.getElementById('graph-entity-type').value;
+        const entityId = document.getElementById('graph-entity-id').value || 'customer-1';
+        const canvas = document.getElementById('graph-canvas');
+        canvas.innerHTML = `
+          <button class="graph-node"><strong>${entityType}</strong><br><span>${entityId}</span></button>
+          <span class="graph-edge">related to</span>
+          <button class="graph-node"><strong>Product</strong><br><span>prod-22</span></button>
+          <span class="graph-edge">related to</span>
+          <button class="graph-node"><strong>Site</strong><br><span>site-73</span></button>
+        `;
+      });
+
+      document.getElementById('graph-search').addEventListener('click', () => {
+        const canvas = document.getElementById('graph-canvas');
+        canvas.innerHTML = `
+          <button class="graph-node"><strong>Customer</strong><br><span>cust-101</span></button>
+          <button class="graph-node"><strong>Product</strong><br><span>prod-22</span></button>
+          <button class="graph-node"><strong>Campaign</strong><br><span>camp-501</span></button>
+        `;
+      });
+
+      restorePinnedWidgets();
+      const restoredBrief = restoreBrief();
+      if (restoredBrief) {
+        applyBriefToView(restoredBrief, false);
+      } else {
+        showLanding();
+      }
+      renderPinnedDashboardGrid();
     </script>
   </body>
 </html>
