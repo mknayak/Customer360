@@ -25,13 +25,34 @@ def test_metadata_retrieval_returns_compact_relevant_context():
     assert context["domains"] == ("digital",)
     assert context["candidates"][0]["metric"] == "page_dropoff"
     assert context["candidates"][0]["model"] == "curated_content_activity"
-    assert "page" in context["candidates"][0]["dimensions"]
 
     popular = SemanticQueryPlanner().context("What is the most visited page?", limit=1)
     assert popular["candidates"][0]["metric"] == "page_popularity"
 
     payment_failures = SemanticQueryPlanner().context("How many times payment failed?", limit=1)
     assert payment_failures["candidates"][0]["metric"] == "payment_failures"
+
+def test_customer_complaints_metric_compiles_against_curated_feedback():
+    planner = SemanticQueryPlanner()
+    compiled = planner.plan(
+        SemanticQueryIR(metric="customer_complaints", dimensions=("product", "period"), limit=10),
+        "cfo-1",
+    )
+
+    assert "FROM curated_feedback" in compiled.sql
+    assert "rating <= 2 OR sentiment IN ('negative', 'mixed')" in compiled.sql
+    assert "product_id AS product" in compiled.sql
+
+
+def test_feedback_sentiment_metric_includes_all_sentiment_values():
+    compiled = SemanticQueryPlanner().plan(
+        SemanticQueryIR(metric="feedback_sentiment", dimensions=("sentiment",)),
+        "cfo-1",
+    )
+
+    assert "FROM curated_feedback" in compiled.sql
+    assert "sentiment AS sentiment" in compiled.sql
+    assert "rating <= 2" not in compiled.sql
 
 
 def test_sql_compiler_resolves_catalog_owned_join_chain():

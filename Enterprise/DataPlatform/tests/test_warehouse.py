@@ -19,6 +19,35 @@ def test_ingestion_is_idempotent_and_builds_curated_kpis(tmp_path):
     warehouse.close()
 
 
+def test_feedback_is_curated_as_customer_complaints(tmp_path):
+    warehouse = EventWarehouse(tmp_path / "analytics.sqlite3")
+    warehouse.ingest([
+        {"event_id": "feedback-1", "source_service": "feedback", "event_type": "FeedbackSubmitted", "aggregate_type": "feedback", "aggregate_id": "feedback-1", "occurred_at": "2026-09-10T00:00:00Z", "payload": {"feedback_id": "feedback-1", "customer_id": "customer-1", "source": "support", "rating": 2, "comment": "Delivery was late", "sentiment": "negative", "status": "submitted"}},
+        {"event_id": "feedback-2", "source_service": "feedback", "event_type": "FeedbackSubmitted", "aggregate_type": "feedback", "aggregate_id": "feedback-2", "occurred_at": "2026-09-11T00:00:00Z", "payload": {"feedback_id": "feedback-2", "customer_id": "customer-2", "source": "survey", "rating": 5, "sentiment": "positive", "status": "submitted"}},
+    ])
+
+    assert warehouse.kpi("customer_complaints")["value"] == 1
+    rows = warehouse.connection.execute("SELECT comment, sentiment FROM curated_feedback WHERE rating <= 2 OR sentiment IN ('negative', 'mixed')").fetchall()
+    assert [dict(row) for row in rows] == [{"comment": "Delivery was late", "sentiment": "negative"}]
+    warehouse.close()
+
+
+def test_abandoned_cart_value_and_missed_opportunity_rate(tmp_path):
+    warehouse = EventWarehouse(tmp_path / "analytics.sqlite3")
+    base = {"source_service": "shopping", "aggregate_type": "cart", "occurred_at": "2026-09-01T00:00:00Z"}
+    warehouse.ingest([
+        {**base, "event_id": "cart-1", "event_type": "CartCreated", "aggregate_id": "cart-1", "payload": {"customer_id": "customer-1"}},
+        {**base, "event_id": "item-1", "event_type": "CartItemAdded", "aggregate_id": "cart-1", "payload": {"cart_item_id": "item-1", "cart_id": "cart-1", "product_id": "product-1", "quantity": 2, "unit_price": 25}},
+        {**base, "event_id": "abandon-1", "event_type": "CartAbandoned", "aggregate_id": "cart-1", "payload": {"customer_id": "customer-1"}},
+        {**base, "event_id": "cart-2", "event_type": "CartCreated", "aggregate_id": "cart-2", "payload": {"customer_id": "customer-2"}},
+        {**base, "event_id": "item-2", "event_type": "CartItemAdded", "aggregate_id": "cart-2", "payload": {"cart_item_id": "item-2", "cart_id": "cart-2", "product_id": "product-2", "quantity": 1, "unit_price": 50}},
+    ])
+
+    result = warehouse.kpi("abandoned_cart_value")
+    assert result["value"] == {"abandoned_value": 50.0, "total_value": 100.0, "missed_opportunity_rate": 0.5}
+    warehouse.close()
+
+
 def test_average_cart_value_excludes_failed_orders(tmp_path):
     warehouse = EventWarehouse(tmp_path / "analytics.sqlite3")
     warehouse.ingest([

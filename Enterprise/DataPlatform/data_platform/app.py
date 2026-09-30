@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from .warehouse import EventWarehouse
 from .semantic_query import SemanticQueryIR, SemanticQueryPlanner
 from .text_to_sql import SQLValidationError, TextToSQLService
+from .coverage import coverage_snapshot
 
 
 class EventBatch(BaseModel):
@@ -148,6 +149,11 @@ def data_quality() -> dict[str, Any]:
 @app.get("/api/catalog")
 def metric_catalog() -> list[dict[str, Any]]:
     return warehouse.catalog()
+
+
+@app.get("/api/coverage")
+def coverage() -> dict[str, Any]:
+    return coverage_snapshot(warehouse.connection, semantic_query_planner.catalog)
 
 
 @app.post("/api/reconcile")

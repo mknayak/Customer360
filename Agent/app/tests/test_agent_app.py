@@ -41,6 +41,8 @@ def test_ui_route_includes_decisionos_dashboard_shell():
     assert "Executive Live Dashboard" in html
     assert "Pin to Dashboard" in html
     assert "pinned-badge-count" in html
+    assert "remove-pinned-widget" in html
+    assert "pinnedWidgets.splice(widgetIndex, 1)" in html
 
 
 def test_ui_brief_visuals_use_response_rows():
@@ -54,10 +56,22 @@ def test_ui_brief_visuals_use_response_rows():
     assert "const values = chartRows.length ? chartRows.map(row => row.value) : [0];" in html
 
 
-def test_ui_home_page_has_at_least_ten_example_questions():
+def test_prompt_library_has_categories_with_prompts():
+    html = TestClient(app).get("/").text
+    assert "loadPromptLibrary()" in html
+
+    categories = TestClient(app).get("/api/prompt-library").json()["categories"]
+    assert len(categories) >= 8
+    assert all(len(category["prompts"]) >= 10 for category in categories)
+
+
+def test_ui_dashboard_pins_retain_query_provenance_and_refresh():
     html = TestClient(app).get("/").text
 
-    assert html.count('class="sample-question') >= 10
+    assert "investigationId: activeBrief.investigation_id" in html
+    assert "queryId: query.query_id || null" in html
+    assert "refresh-pinned-widget" in html
+    assert "body: JSON.stringify({prompt: widget.question" in html
 
 
 def test_chat_endpoint_runs_investigation_from_prompt():

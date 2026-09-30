@@ -25,6 +25,17 @@ memory_record
 audit_event
 - audit_id, user_id, investigation_id, action, resource, result
 - policy_version, request_id, occurred_at
+
+dashboard_widget
+- widget_id, owner_id, workspace_id, title, question, visualization_spec
+- investigation_id, evidence_id, query_reference, query_snapshot
+- refresh_policy, last_refreshed_at, status, created_at, updated_at
+
+Dashboard widgets should reference the investigation and immutable evidence/query
+record that produced them. A refresh should re-run the authorized question through
+the governed query path and create a new investigation/evidence version; it should
+not blindly execute SQL copied from the browser. Keep `query_snapshot` only for
+lineage and audit, with access controls matching the underlying data.
 ```
 
 ## Integrity requirements

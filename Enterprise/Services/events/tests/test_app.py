@@ -76,5 +76,9 @@ def test_consumer_checkpoint_poll_and_ack(tmp_path):
     event = client.post("/api/events", json={"source_service": "content-site", "event_type": "PageVisit", "aggregate_type": "content_session", "aggregate_id": "s1", "correlation_id": "s1", "payload": {}}).json()
     poll = client.get("/api/consumers/warehouse/poll").json()
     assert poll["events"][0]["event_id"] == event["event_id"]
+    assert client.get("/api/consumers/warehouse/lag").json()["pending"] == 1
     assert client.post(f"/api/consumers/warehouse/ack", json={"event_id": event["event_id"]}).status_code == 200
     assert client.get("/api/consumers/warehouse/poll").json()["events"] == []
+    assert client.get("/api/consumers/warehouse/lag").json()["pending"] == 0
+    assert client.get("/api/events/stats").json() == {"events": 1, "sources": 1, "event_types": 1, "correlations": 1}
+    assert client.get("/api/events/stats?correlation_id=other").json()["events"] == 0

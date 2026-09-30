@@ -110,6 +110,12 @@ def analytics_metric_handler(inputs: Mapping[str, Any]):
         )
 
 
+def _data_platform_get(path: str, timeout: float = 5) -> dict[str, Any]:
+    origin = os.getenv("DATA_PLATFORM_ORIGIN", "http://127.0.0.1:8010").rstrip("/")
+    with urlopen(f"{origin}{path}", timeout=timeout) as response:
+        return json.loads(response.read())
+
+
 def _data_platform_post(path: str, payload: Mapping[str, Any], timeout: float = 15) -> dict[str, Any]:
     origin = os.getenv("DATA_PLATFORM_ORIGIN", "http://127.0.0.1:8010").rstrip("/")
     request = Request(f"{origin}{path}", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
@@ -231,12 +237,21 @@ def resolve_metric(prompt: str) -> tuple[str, str, str]:
         return "segment_conversion", "Segment conversion", "results"
     if "payment" in normalized and any(keyword in normalized for keyword in ("fail", "failure", "declin")):
         return "payment_failures", "Payment failures", "failures"
+    if "cart" in normalized and any(keyword in normalized for keyword in ("value", "missed", "opportun")):
+        return "abandoned_cart_value", "Abandoned cart value", "USD"
+    if "sentiment" in normalized:
+        return "feedback_sentiment", "Feedback sentiment", "feedback records"
+    if any(keyword in normalized for keyword in ("complaint", "complaints", "feedback", "dissatisfaction", "negative review", "customer voice")):
+        return "customer_complaints", "Customer complaints", "complaints"
     candidates = (
         ("page_popularity", "Most visited page", "pages"),
         ("page_dropoff", "Most dropped page", "pages"),
         ("product_performance", "Product performance", "results"),
         ("average_cart_value", "Average cart value", "USD"),
+        ("abandoned_cart_value", "Abandoned cart value", "USD"),
         ("payment_failures", "Payment failures", "failures"),
+        ("feedback_sentiment", "Feedback sentiment", "feedback records"),
+        ("customer_complaints", "Customer complaints", "complaints"),
         ("cart_abandonment", "Cart abandonment", "%"),
         ("conversion", "Conversion rate", "%"),
         ("visits", "Visits", "visits"),
@@ -248,7 +263,10 @@ def resolve_metric(prompt: str) -> tuple[str, str, str]:
         "page_dropoff": ("dropped page", "drop off", "dropoff", "page exit", "exited page", "bounce page"),
         "product_performance": ("product", "sku", "units", "sell-through", "underperform"),
         "average_cart_value": ("average cart value", "avg cart value", "average order value", "average cart"),
+        "abandoned_cart_value": ("abandoned cart value", "cart value lost", "missed opportunity", "missed opportunities"),
         "payment_failures": ("payment failed", "payment failure", "failed payment", "payments failed", "declined payment"),
+        "feedback_sentiment": ("sentiment", "positive feedback", "neutral feedback", "negative feedback", "mixed feedback"),
+        "customer_complaints": ("complaint", "complaints", "feedback", "dissatisfaction", "negative review", "customer voice"),
         "cart_abandonment": ("abandon", "cart"),
         "conversion": ("conversion", "funnel"),
         "visits": ("visit", "traffic", "session"),
@@ -271,6 +289,8 @@ def select_metric_with_model(prompt: str) -> tuple[tuple[str, str, str], str, di
         selection = resolve_metric(prompt)
         granularity = trend_granularity(prompt)
         if granularity:
+            if selection[0] == "feedback_sentiment":
+                return selection, "deterministic", {"dimensions": ["period", "sentiment"], "filters": {}, "joins": [], "order": "desc", "limit": 100}
             return selection, "deterministic", {"granularity": granularity}
         if selection[0] == "product_performance" and "customer" in prompt.casefold():
             return selection, "deterministic", {"dimensions": ["customer", "product"], "filters": {}, "joins": ["orders"], "order": "desc", "limit": 25}
@@ -289,7 +309,8 @@ def select_metric_with_model(prompt: str) -> tuple[tuple[str, str, str], str, di
 
     metric_options = (
         "revenue, visits, conversion, cart_abandonment, retention, segment_conversion, "
-        "product_performance, average_cart_value, page_popularity, page_dropoff, payment_failures"
+        "product_performance, average_cart_value, abandoned_cart_value, page_popularity, page_dropoff, payment_failures, customer_complaints"
+        ", feedback_sentiment"
     )
     granularity = trend_granularity(prompt)
     request = ModelRequest(
@@ -331,12 +352,17 @@ def select_metric_with_model(prompt: str) -> tuple[tuple[str, str, str], str, di
             "segment_conversion": ("Segment conversion", "results"),
             "product_performance": ("Product performance", "results"),
             "average_cart_value": ("Average cart value", "USD"),
+            "abandoned_cart_value": ("Abandoned cart value", "USD"),
             "page_popularity": ("Most visited page", "pages"),
             "page_dropoff": ("Most dropped page", "pages"),
             "payment_failures": ("Payment failures", "failures"),
+            "feedback_sentiment": ("Feedback sentiment", "feedback records"),
+            "customer_complaints": ("Customer complaints", "complaints"),
         }
         label, unit = labels[metric]
         if granularity:
+            if metric == "feedback_sentiment":
+                return (metric, label, unit), response.model, {"dimensions": ["period", "sentiment"], "filters": filters, "joins": joins, "order": order, "limit": limit}
             return (metric, label, unit), response.model, {"granularity": granularity}
         return (metric, label, unit), response.model, {"dimensions": dimensions, "filters": filters, "joins": joins, "order": order, "limit": limit}
     except (OSError, ValueError, TypeError, json.JSONDecodeError, KeyError):
@@ -417,6 +443,52 @@ def format_metric_answer(metric: str, label: str, value: Any, unit: str) -> tupl
         facts = [f"{product_name(row)}: {row['units']} units and {row['revenue']:.2f} revenue" for row in rows[:3]]
         follow_ups = ["Which products are underperforming relative to forecast?", "Which category contributes most revenue?"]
         return answer, facts, follow_ups
+    if metric == "customer_complaints":
+        rows = value if isinstance(value, list) else []
+        attributed = [row for row in rows if row.get("product")]
+        if not attributed:
+            return (
+                "No product-attributed negative reviews are available.",
+                ["No complaint records with a product_id were returned; negative feedback may be absent or unlinked to products."],
+                ["Which negative reviews are unlinked to products?", "How many complaints came from each feedback source?"],
+            )
+
+        def product_name(row: Mapping[str, Any]) -> str:
+            product_id = str(row["product"])
+            try:
+                product = service_adapters.product.get(product_id)
+                attributes = product.data.get("attributes", {})
+                return attributes.get("name") or attributes.get("sku") or product_id
+            except Exception:
+                return product_id
+
+        top = attributed[0]
+        facts = [f"{product_name(row)}: {row.get('value', 0):,} negative reviews" for row in attributed[:5]]
+        return (
+            f"{product_name(top)} received the most negative reviews ({top.get('value', 0):,}).",
+            facts,
+            ["Which complaint themes are most common for these products?", "How do negative reviews vary by site or campaign?"],
+        )
+    if metric == "feedback_sentiment":
+        rows = value if isinstance(value, list) else []
+        counts: dict[str, int] = {}
+        for row in rows:
+            sentiment = str(row.get("sentiment") or "unknown")
+            counts[sentiment] = counts.get(sentiment, 0) + int(row.get("value", 0) or 0)
+        total = sum(counts.values())
+        if not total:
+            return (
+                "No customer feedback sentiment records are available.",
+                ["The analytics store returned no feedback records with a classified sentiment."],
+                ["How many feedback records have not yet been classified?"],
+            )
+        ordered = [sentiment for sentiment in ("positive", "neutral", "negative", "mixed", "unknown") if sentiment in counts]
+        facts = [f"{sentiment.title()}: {counts[sentiment]:,} ({counts[sentiment] / total:.1%})" for sentiment in ordered]
+        return (
+            f"Customer feedback sentiment covers {total:,} records: " + ", ".join(facts),
+            facts,
+            ["How is negative sentiment trending by month?", "Which products have the most negative feedback?"],
+        )
     if metric == "page_dropoff":
         rows = value if isinstance(value, list) else []
         if not rows:
@@ -446,6 +518,18 @@ def format_metric_answer(metric: str, label: str, value: Any, unit: str) -> tupl
         answer = f"There have been {numeric:,} payment failures."
         facts = [f"Payment failures resolved to {numeric:,} PaymentFailed events."]
         return answer, facts, ["What is the most common payment failure reason?", "How do payment failures vary by period?"]
+    if metric == "abandoned_cart_value":
+        details = value if isinstance(value, dict) else {}
+        abandoned_value = float(details.get("abandoned_value", 0) or 0)
+        opportunity_rate = float(details.get("missed_opportunity_rate", 0) or 0)
+        total_value = float(details.get("total_value", 0) or 0)
+        answer = f"Abandoned carts represent ${abandoned_value:,.2f} in missed opportunity value, or {opportunity_rate:.2%} of total cart value."
+        facts = [
+            f"Abandoned cart value: ${abandoned_value:,.2f}.",
+            f"Total cart value: ${total_value:,.2f}.",
+            "Missed opportunity rate = abandoned cart value / total cart value.",
+        ]
+        return answer, facts, ["Which products account for the most abandoned value?", "How does cart abandonment vary by site or delivery mode?"]
     numeric = float(value or 0)
     display_value = numeric * 100 if unit == "%" else numeric
     formatted = f"{display_value:,.2f}" if unit in {"USD", "%"} else f"{display_value:,.0f}"
@@ -532,6 +616,7 @@ class InvestigationRequest(ChatRequest):
 
 conversation_history: dict[str, list[dict[str, str]]] = {}
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "index.html"
+PROMPT_LIBRARY = json.loads((Path(__file__).parent / "prompt_library.json").read_text(encoding="utf-8"))
 
 
 def build_executive_brief(
@@ -721,6 +806,11 @@ def index() -> str:
     return TEMPLATE_PATH.read_text(encoding="utf-8")
 
 
+@app.get("/api/prompt-library")
+def prompt_library() -> dict[str, Any]:
+    return PROMPT_LIBRARY
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "agent-app"}
@@ -729,6 +819,57 @@ def health() -> dict[str, str]:
 @app.get("/api/adapters/health")
 def adapter_health():
   return service_adapters.health()
+
+
+LANDING_TILES: tuple[dict[str, str], ...] = (
+    {"metric": "revenue", "label": "Succeeded order revenue", "format": "currency", "owner": "Finance"},
+    {"metric": "average_cart_value", "label": "Average order value", "format": "currency", "owner": "Commerce"},
+    {"metric": "conversion", "label": "Visit-to-order conversion", "format": "percent", "owner": "Digital"},
+    {"metric": "retention", "label": "Repeat purchase rate", "format": "percent", "owner": "Customer"},
+    {"metric": "payment_failures", "label": "Payment failures", "format": "count", "owner": "Commerce"},
+    {"metric": "customer_complaints", "label": "Negative feedback", "format": "count", "owner": "Voice of customer"},
+)
+
+
+@app.get("/api/landing/overview")
+def landing_overview() -> dict[str, Any]:
+    """Governed KPI strip for the landing view; every tile carries its source and definition."""
+    tiles: list[dict[str, Any]] = []
+    for tile in LANDING_TILES:
+        try:
+            result = _data_platform_get(f"/api/kpis/{tile['metric']}")
+        except (URLError, OSError, json.JSONDecodeError):
+            tiles.append({**tile, "status": "unavailable", "value": None, "source": "data-platform", "definition": None})
+            continue
+        tiles.append({
+            **tile,
+            "status": "resolved",
+            "value": result.get("value"),
+            "numerator": result.get("numerator"),
+            "denominator": result.get("denominator"),
+            "source": result.get("source", "data-platform"),
+            "definition": result.get("definition"),
+        })
+
+    try:
+        quality = _data_platform_get("/api/quality")
+        platform_status = "online"
+    except (URLError, OSError, json.JSONDecodeError):
+        quality = {}
+        platform_status = "offline"
+
+    return {
+        "data_classification": "synthetic",
+        "tiles": tiles,
+        "platform": {
+            "data_platform": platform_status,
+            "raw_events": quality.get("raw_events"),
+            "latest_event_at": quality.get("latest_occurred_at"),
+            "quality_passed": (quality.get("checks") or {}).get("passed"),
+            "model_provider": getattr(model_provider, "model", "deterministic-test"),
+            "model_configured": isinstance(model_provider, OpenAICompatibleModelProvider),
+        },
+    }
 
 
 @app.get("/api/agent/model-status")

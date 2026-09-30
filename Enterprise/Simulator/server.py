@@ -35,6 +35,11 @@ class SimulatorHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
 
+    def end_headers(self):
+        # Local dev UI: always serve the latest static files.
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def do_GET(self):
         if self._is_service_path():
             self._proxy("GET")
@@ -71,8 +76,10 @@ class SimulatorHandler(SimpleHTTPRequestHandler):
         origin = PROXY_ORIGINS[prefix]
         request = Request(f"{origin}{self.path[len(prefix) + 1:]}", data=request_body, method=method)
         request.add_header("Content-Type", self.headers.get("Content-Type", "application/json"))
+        # Warehouse ingestion can process many batches in one call.
+        timeout = 120 if prefix == "data-platform" else 5
         try:
-            with urlopen(request, timeout=5) as response:
+            with urlopen(request, timeout=timeout) as response:
                 payload = response.read()
                 self.send_response(response.status)
                 self.send_header("Content-Type", response.headers.get("Content-Type", "application/json"))

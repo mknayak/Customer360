@@ -48,6 +48,10 @@ class EventWarehouse:
                 CREATE TABLE IF NOT EXISTS curated_carts (
                     cart_id TEXT PRIMARY KEY, customer_id TEXT, occurred_at TEXT NOT NULL, abandoned INTEGER NOT NULL DEFAULT 0
                 );
+                CREATE TABLE IF NOT EXISTS curated_cart_items (
+                    cart_item_id TEXT PRIMARY KEY, cart_id TEXT NOT NULL, product_id TEXT NOT NULL,
+                    quantity INTEGER NOT NULL, unit_price REAL NOT NULL DEFAULT 0, value REAL NOT NULL DEFAULT 0
+                );
                 CREATE TABLE IF NOT EXISTS curated_orders (
                     order_id TEXT PRIMARY KEY, customer_id TEXT, occurred_at TEXT NOT NULL,
                     payment_status TEXT, total_amount REAL NOT NULL DEFAULT 0
@@ -75,6 +79,12 @@ class EventWarehouse:
                 CREATE TABLE IF NOT EXISTS dim_customer_profiles (
                     customer_id TEXT PRIMARY KEY, age_group TEXT, city TEXT, country TEXT,
                     preferred_channel TEXT, status TEXT, updated_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS curated_feedback (
+                    feedback_id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, source TEXT NOT NULL,
+                    rating INTEGER NOT NULL, comment TEXT, product_id TEXT, order_id TEXT,
+                    campaign_id TEXT, site_id TEXT, sentiment TEXT NOT NULL, status TEXT NOT NULL,
+                    occurred_at TEXT NOT NULL
                 );
                 """
             )
@@ -308,6 +318,9 @@ class EventWarehouse:
             if metric == "payment_failures":
                 row = self.connection.execute("SELECT COUNT(*) AS value FROM raw_events WHERE event_type = 'PaymentFailed'").fetchone()
                 return {"metric": metric, "value": row["value"], "source": "raw_events", "definition": "Count of PaymentFailed events"}
+            if metric == "customer_complaints":
+                row = self.connection.execute("SELECT COUNT(*) AS value FROM curated_feedback WHERE rating <= 2 OR sentiment IN ('negative', 'mixed')").fetchone()
+                return {"metric": metric, "value": row["value"], "source": "curated_feedback", "definition": "Count of feedback records rated 1-2 or classified as negative/mixed"}
             if metric == "visits":
                 row = self.connection.execute("SELECT COUNT(*) AS value FROM curated_visits").fetchone()
                 return {"metric": metric, "value": row["value"], "source": "curated_visits"}
@@ -319,6 +332,23 @@ class EventWarehouse:
                 carts = self.connection.execute("SELECT COUNT(*) AS value FROM curated_carts").fetchone()["value"]
                 abandoned = self.connection.execute("SELECT COUNT(*) AS value FROM curated_carts WHERE abandoned = 1").fetchone()["value"]
                 return {"metric": metric, "value": round(abandoned / carts, 4) if carts else 0, "numerator": abandoned, "denominator": carts, "source": "curated_carts"}
+            if metric == "abandoned_cart_value":
+                row = self.connection.execute(
+                    """
+                    SELECT COALESCE(SUM(CASE WHEN carts.abandoned = 1 THEN items.value ELSE 0 END), 0) AS abandoned_value,
+                           COALESCE(SUM(items.value), 0) AS total_value
+                    FROM curated_carts AS carts
+                    LEFT JOIN curated_cart_items AS items ON items.cart_id = carts.cart_id
+                    """
+                ).fetchone()
+                abandoned_value = round(row["abandoned_value"], 2)
+                total_value = round(row["total_value"], 2)
+                return {
+                    "metric": metric,
+                    "value": {"abandoned_value": abandoned_value, "total_value": total_value, "missed_opportunity_rate": round(abandoned_value / total_value, 4) if total_value else 0},
+                    "source": "curated_carts+curated_cart_items",
+                    "definition": "Abandoned cart item value; missed opportunity rate = abandoned cart value / total cart value",
+                }
             if metric == "retention":
                 customers = self.connection.execute(
                     "SELECT COUNT(DISTINCT customer_id) AS value FROM curated_orders WHERE payment_status = 'succeeded' AND customer_id IS NOT NULL"
@@ -373,6 +403,15 @@ class EventWarehouse:
             self.connection.execute("INSERT OR IGNORE INTO curated_carts VALUES (?, ?, ?, ?)", (cart_id, payload.get("customer_id"), occurred_at, int(event_type == "CartAbandoned")))
             if event_type == "CartAbandoned":
                 self.connection.execute("UPDATE curated_carts SET abandoned = 1 WHERE cart_id = ?", (cart_id,))
+        elif event_type in {"CartItemAdded", "CartItemUpdated"}:
+            quantity = int(payload.get("quantity", 0) or 0)
+            unit_price = float(payload.get("unit_price", 0) or 0)
+            self.connection.execute(
+                "INSERT OR REPLACE INTO curated_cart_items (cart_item_id, cart_id, product_id, quantity, unit_price, value) VALUES (?, ?, ?, ?, ?, ?)",
+                (payload["cart_item_id"], payload["cart_id"], payload["product_id"], quantity, unit_price, quantity * unit_price),
+            )
+        elif event_type == "CartItemRemoved":
+            self.connection.execute("DELETE FROM curated_cart_items WHERE cart_item_id = ?", (payload["cart_item_id"],))
         elif event_type == "OrderCreated":
             order_id = event["aggregate_id"]
             total = payload.get("total_amount", payload.get("total", 0)) or 0
@@ -396,6 +435,24 @@ class EventWarehouse:
                 "INSERT OR REPLACE INTO curated_content_activity VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (event_id, payload.get("session_id", event.get("correlation_id")), payload.get("customer_id"), payload.get("content_id", payload.get("last_page")), event_type, occurred_at, float(payload.get("duration_seconds", 0) or 0)),
             )
+        elif event_type in {"FeedbackSubmitted", "FeedbackUpdated"}:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO curated_feedback
+                (feedback_id, customer_id, source, rating, comment, product_id, order_id,
+                 campaign_id, site_id, sentiment, status, occurred_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload.get("feedback_id", event["aggregate_id"]), payload["customer_id"],
+                    payload.get("source", "unknown"), int(payload.get("rating", 0) or 0),
+                    payload.get("comment"), payload.get("product_id"), payload.get("order_id"),
+                    payload.get("campaign_id"), payload.get("site_id"),
+                    payload.get("sentiment", "unknown"), payload.get("status", "submitted"), occurred_at,
+                ),
+            )
+        elif event_type == "FeedbackDeleted":
+            self.connection.execute("DELETE FROM curated_feedback WHERE feedback_id = ?", (payload.get("feedback_id", event["aggregate_id"]),))
 
     def quality(self) -> dict[str, Any]:
         with self.lock:
@@ -409,7 +466,9 @@ class EventWarehouse:
             {"metric": "revenue", "definition": "Succeeded order total", "source": "curated_orders", "grain": "order", "lineage": "OrderCreated -> curated_orders", "owner": "finance"},
             {"metric": "average_cart_value", "definition": "Average total amount of successful orders", "source": "curated_orders", "grain": "order", "lineage": "OrderCreated -> curated_orders", "owner": "commerce"},
             {"metric": "payment_failures", "definition": "Count of PaymentFailed events", "source": "raw_events", "grain": "payment event", "lineage": "PaymentFailed -> raw_events", "owner": "commerce"},
+            {"metric": "customer_complaints", "definition": "Count of low-rated or negative/mixed-sentiment feedback", "source": "curated_feedback", "grain": "feedback record", "lineage": "FeedbackSubmitted/FeedbackUpdated -> curated_feedback", "owner": "customer"},
             {"metric": "conversion", "definition": "Succeeded orders divided by visits", "source": "curated_visits+curated_orders", "grain": "period", "lineage": "VisitStarted + OrderCreated", "owner": "digital"},
+            {"metric": "abandoned_cart_value", "definition": "Abandoned cart value and share of total cart value", "source": "curated_carts+curated_cart_items", "grain": "cart item", "lineage": "CartCreated + CartItemAdded + CartAbandoned", "owner": "commerce"},
             {"metric": "content_views", "definition": "Count of content view events", "source": "curated_content_activity", "grain": "content event", "lineage": "ContentView -> curated_content_activity", "owner": "digital"},
             {"metric": "gross_margin", "definition": "Revenue less cost divided by revenue", "source": "curated_finance", "grain": "order", "lineage": "OrderCreated -> curated_finance", "owner": "finance"},
         ]

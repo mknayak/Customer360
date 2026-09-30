@@ -6,13 +6,13 @@ from typing import Any, Mapping
 
 
 EVENT_CONTRACTS: dict[str, tuple[str, ...]] = {
-    "site": ("SiteCreated", "VisitStarted", "VisitEnded"),
+    "site": ("SiteCreated", "SiteUpdated", "SiteDeleted", "VisitStarted", "VisitEnded"),
     "content-site": ("PageVisit", "ContentView", "Search", "TimeOnPage", "Exit", "UserLogin", "ProductViewed", "CartCreated", "CheckoutStarted", "PaymentFailed", "OrderCreated"),
     "shopping": ("CartCreated", "CartItemAdded", "CartItemUpdated", "CartItemRemoved", "CartAbandoned", "OrderCreated", "PaymentCompleted", "PaymentFailed", "OrderCancelled", "OrderStatusChanged"),
     "crm": ("CustomerCreated", "CustomerUpdated", "CustomerDeleted", "CustomersImported"),
-    "product": ("ProductCreated", "ProductUpdated", "PriceChanged", "PromotionCreated", "PromotionStarted", "PromotionEnded", "CatalogImported"),
-    "feedback": ("FeedbackSubmitted", "FeedbackUpdated"),
-    "marketing": ("CampaignCreated", "CampaignStarted", "CampaignEnded", "CampaignAudienceChanged", "CampaignInteractionRecorded", "CampaignsImported"),
+    "product": ("CategoryCreated", "ProductCreated", "ProductUpdated", "PriceChanged", "PromotionCreated", "PromotionStarted", "PromotionEnded", "CatalogImported"),
+    "feedback": ("FeedbackSubmitted", "FeedbackUpdated", "FeedbackDeleted"),
+    "marketing": ("CampaignCreated", "CampaignStarted", "CampaignEnded", "CampaignAudienceChanged", "CampaignInteractionRecorded", "CampaignsImported", "AudienceCreated", "ChannelCreated", "CampaignAudienceAssigned", "CampaignChannelAssigned"),
     "orchestration": ("WorkflowStarted", "WorkflowCompleted", "WorkflowFailed"),
 }
 

@@ -58,11 +58,14 @@ def event_contracts() -> dict[str, tuple[str, ...]]:
 @app.get("/api/consumers/{consumer_id}/poll")
 def poll_consumer(consumer_id: str, limit: int = Query(default=100, ge=1, le=1000)) -> dict[str, object]:
     cursor = repository.checkpoint(consumer_id)
-    events = repository.list_events(limit=10_000)
-    if cursor:
-        event_ids = [event.event_id for event in events]
-        events = events[event_ids.index(cursor) + 1:] if cursor in event_ids else events
-    return {"consumer_id": consumer_id, "checkpoint": cursor, "events": events[:limit]}
+    events = repository.events_after(cursor, limit)
+    return {"consumer_id": consumer_id, "checkpoint": cursor, "events": events}
+
+
+@app.get("/api/consumers/{consumer_id}/lag")
+def consumer_lag(consumer_id: str) -> dict[str, object]:
+    cursor = repository.checkpoint(consumer_id)
+    return {"consumer_id": consumer_id, "checkpoint": cursor, "pending": repository.pending_count(cursor)}
 
 
 @app.post("/api/consumers/{consumer_id}/ack")
@@ -90,7 +93,13 @@ def list_events(
         correlation_id=correlation_id,
         recorded_after=recorded_after,
         limit=limit,
+        newest_first=True,
     )
+
+
+@app.get("/api/events/stats")
+def event_stats(correlation_id: str | None = Query(default=None)) -> dict[str, int]:
+    return repository.stats(correlation_id)
 
 
 @app.get("/api/events/replay", response_model=list[Event])

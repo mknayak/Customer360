@@ -106,6 +106,7 @@ class EventRepository:
         correlation_id: str | None = None,
         recorded_after: datetime | None = None,
         limit: int = 100,
+        newest_first: bool = False,
     ) -> list[Event]:
         clauses: list[str] = []
         params: list[str | int] = []
@@ -124,11 +125,41 @@ class EventRepository:
         query = "SELECT * FROM events"
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
-        query += " ORDER BY recorded_at, event_id LIMIT ?"
+        query += " ORDER BY recorded_at DESC, event_id DESC LIMIT ?" if newest_first else " ORDER BY recorded_at, event_id LIMIT ?"
         params.append(limit)
         with self.lock:
             rows = self.connection.execute(query, params).fetchall()
         return [self.event(row) for row in rows]
+
+    def events_after(self, cursor: str | None, limit: int) -> list[Event]:
+        with self.lock:
+            anchor = self.connection.execute("SELECT recorded_at, event_id FROM events WHERE event_id = ?", (cursor,)).fetchone() if cursor else None
+            if anchor is None:
+                rows = self.connection.execute("SELECT * FROM events ORDER BY recorded_at, event_id LIMIT ?", (limit,)).fetchall()
+            else:
+                rows = self.connection.execute(
+                    "SELECT * FROM events WHERE (recorded_at, event_id) > (?, ?) ORDER BY recorded_at, event_id LIMIT ?",
+                    (anchor["recorded_at"], anchor["event_id"], limit),
+                ).fetchall()
+        return [self.event(row) for row in rows]
+
+    def stats(self, correlation_id: str | None = None) -> dict[str, int]:
+        where, params = ("WHERE correlation_id = ?", (correlation_id,)) if correlation_id else ("", ())
+        with self.lock:
+            row = self.connection.execute(
+                f"SELECT COUNT(*), COUNT(DISTINCT source_service), COUNT(DISTINCT event_type), COUNT(DISTINCT correlation_id) FROM events {where}",
+                params,
+            ).fetchone()
+        return {"events": row[0], "sources": row[1], "event_types": row[2], "correlations": row[3]}
+
+    def pending_count(self, cursor: str | None) -> int:
+        with self.lock:
+            anchor = self.connection.execute("SELECT recorded_at, event_id FROM events WHERE event_id = ?", (cursor,)).fetchone() if cursor else None
+            if anchor is None:
+                return self.connection.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+            return self.connection.execute(
+                "SELECT COUNT(*) FROM events WHERE (recorded_at, event_id) > (?, ?)", (anchor["recorded_at"], anchor["event_id"])
+            ).fetchone()[0]
 
     def close(self) -> None:
         with self.lock:

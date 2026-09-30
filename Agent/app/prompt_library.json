@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "revenue-finance",
+      "label": "Revenue & Finance",
+      "icon": "fa-sack-dollar",
+      "color": "text-emerald-500",
+      "prompts": [
+        {"title": "Q3 Margin Contraction", "question": "Why did gross margins contract in Q3 across hardware product lines?"},
+        {"title": "Revenue Trend", "question": "How is revenue trending by month?"},
+        {"title": "Weekly Revenue", "question": "Show revenue by week for the last quarter"},
+        {"title": "Revenue by Site", "question": "What is revenue by site?"},
+        {"title": "Revenue by Category", "question": "Which product category generates the most revenue?"},
+        {"title": "Average Order Value", "question": "What is the average order value this month?"},
+        {"title": "AOV Trend", "question": "How is average order value trending by month?"},
+        {"title": "Revenue Drop", "question": "Why did revenue fall last month?"},
+        {"title": "Pricing Simulation", "question": "Forecast revenue impact of a 10% price increase on Tier-1 SaaS subscriptions"},
+        {"title": "Discount Leakage", "question": "How much revenue did we give away in discounts this quarter?"}
+      ]
+    },
+    {
+      "id": "customer-retention",
+      "label": "Customer & Retention",
+      "icon": "fa-users",
+      "color": "text-cyan-500",
+      "prompts": [
+        {"title": "Retention Trend", "question": "How is customer retention trending by month?"},
+        {"title": "Churn Spike", "question": "Why did North America enterprise customer churn spike in July?"},
+        {"title": "Active Customers", "question": "How many active customers do we have?"},
+        {"title": "New vs Returning", "question": "Compare new versus returning customer revenue"},
+        {"title": "Top Customers", "question": "Who are our top 10 customers by revenue?"},
+        {"title": "Customer Segments", "question": "What is revenue by customer segment?"},
+        {"title": "Repeat Purchase Rate", "question": "What is the repeat purchase rate?"},
+        {"title": "At-Risk Customers", "question": "Which customers are at risk of churning?"},
+        {"title": "Customer Lifetime Value", "question": "What is the average customer lifetime value by segment?"},
+        {"title": "Customers by Region", "question": "How many customers do we have by region?"}
+      ]
+    },
+    {
+      "id": "product-merchandising",
+      "label": "Product & Merchandising",
+      "icon": "fa-box-open",
+      "color": "text-indigo-500",
+      "prompts": [
+        {"title": "Product Demand", "question": "What is the top-selling product by units?"},
+        {"title": "Top Products by Revenue", "question": "What are the top 10 products by revenue?"},
+        {"title": "Slow Movers", "question": "Which products have the lowest sales this quarter?"},
+        {"title": "Category Mix", "question": "What is units sold by product category?"},
+        {"title": "Product Returns", "question": "Which products have the highest return rate?"},
+        {"title": "Most Viewed Products", "question": "Which products are viewed most but purchased least?"},
+        {"title": "Product Ratings", "question": "Which products have the lowest average rating?"},
+        {"title": "Stock Pressure", "question": "Which products are at risk of stock-out based on demand?"},
+        {"title": "Brand Performance", "question": "What is revenue by brand?"},
+        {"title": "Product Trend", "question": "How are units sold trending by week?"}
+      ]
+    },
+    {
+      "id": "promotions-marketing",
+      "label": "Promotions & Marketing",
+      "icon": "fa-bullhorn",
+      "color": "text-violet-500",
+      "prompts": [
+        {"title": "Channel ROI", "question": "Compare customer acquisition cost across channels"},
+        {"title": "Campaign Revenue", "question": "Which campaign drove the most revenue?"},
+        {"title": "Promotion ROI", "question": "What is the ROI of our active promotions?"},
+        {"title": "Coupon Usage", "question": "Which coupon codes were used most this month?"},
+        {"title": "Email Performance", "question": "What is the click-through rate for recent email campaigns?"},
+        {"title": "Campaign Conversion", "question": "What is the conversion rate by campaign?"},
+        {"title": "Promotion Cannibalization", "question": "Did promotions cannibalize full-price sales last quarter?"},
+        {"title": "Traffic by Source", "question": "What is site traffic by acquisition source?"},
+        {"title": "Underperforming Campaigns", "question": "Which campaigns are underperforming against target?"},
+        {"title": "Promotion Uplift", "question": "What was the sales uplift during the last promotion?"}
+      ]
+    },
+    {
+      "id": "digital-experience",
+      "label": "Digital & Web",
+      "icon": "fa-globe",
+      "color": "text-blue-500",
+      "prompts": [
+        {"title": "Web Drop-off", "question": "What is the most dropped page on our website?"},
+        {"title": "Site Visits", "question": "How many site visits did we have this month?"},
+        {"title": "Visit Trend", "question": "How are site visits trending by week?"},
+        {"title": "Conversion Rate", "question": "What is the site conversion rate?"},
+        {"title": "Bounce Rate", "question": "Which landing pages have the highest bounce rate?"},
+        {"title": "Device Mix", "question": "What is conversion rate by device type?"},
+        {"title": "Search Terms", "question": "What are the top on-site search terms with no results?"},
+        {"title": "Session Duration", "question": "What is the average session duration by site?"},
+        {"title": "Funnel Leakage", "question": "Where do customers drop off in the purchase funnel?"},
+        {"title": "Page Performance", "question": "Which pages have the most exits?"}
+      ]
+    },
+    {
+      "id": "checkout-payments",
+      "label": "Checkout & Payments",
+      "icon": "fa-credit-card",
+      "color": "text-rose-500",
+      "prompts": [
+        {"title": "Payment Failures", "question": "How many times did payment fail this month?"},
+        {"title": "Cart Abandonment", "question": "What is the cart abandonment rate?"},
+        {"title": "Failures by Method", "question": "Show payment failures by payment method"},
+        {"title": "Failures by Device", "question": "Show payment failures by customer device"},
+        {"title": "Failures by Region", "question": "Show payment failures by customer region"},
+        {"title": "Failure Trend", "question": "How are payment failures trending by week?"},
+        {"title": "Abandoned Cart Value", "question": "What is the total value of abandoned carts this month?"},
+        {"title": "Checkout Conversion", "question": "What is the checkout completion rate?"},
+        {"title": "Refunds", "question": "How many refunds were issued this month?"},
+        {"title": "Recovery Opportunity", "question": "How much revenue could we recover by fixing payment failures?"}
+      ]
+    },
+    {
+      "id": "voice-of-customer",
+      "label": "Voice of Customer",
+      "icon": "fa-comments",
+      "color": "text-amber-500",
+      "prompts": [
+        {"title": "Top Complaints", "question": "What are the top customer complaints this month?"},
+        {"title": "Feedback Sentiment", "question": "How is customer feedback sentiment trending?"},
+        {"title": "NPS Trend", "question": "How is NPS trending by month?"},
+        {"title": "Negative Reviews", "question": "Which products received the most negative reviews?"},
+        {"title": "Support Escalations", "question": "What is driving support escalations?"},
+        {"title": "Delivery Issues", "question": "How many feedback items mention late delivery?"},
+        {"title": "Feedback Volume", "question": "How much customer feedback did we receive by channel?"},
+        {"title": "Feedback Themes", "question": "What themes appear most in low-rated feedback?"},
+        {"title": "Satisfaction by Segment", "question": "What is average satisfaction score by customer segment?"},
+        {"title": "Feedback to Churn", "question": "Is negative feedback associated with customer churn?"}
+      ]
+    },
+    {
+      "id": "kpi-watchlist",
+      "label": "KPI & Executive Watchlist",
+      "icon": "fa-gauge-high",
+      "color": "text-slate-600",
+      "prompts": [
+        {"title": "KPI Watchlist", "question": "Which KPI needs attention most urgently this week?"},
+        {"title": "Executive Summary", "question": "Give me an executive summary of business performance this month"},
+        {"title": "Orders Count", "question": "How many orders did we receive this month?"},
+        {"title": "Order Trend", "question": "How are orders trending by month?"},
+        {"title": "KPI Anomalies", "question": "Which KPIs moved unusually compared to last month?"},
+        {"title": "Quarter Comparison", "question": "Compare this quarter's revenue with last quarter"},
+        {"title": "Site Comparison", "question": "Which site is performing best on revenue and conversion?"},
+        {"title": "Growth Drivers", "question": "What are the main drivers of revenue growth this quarter?"},
+        {"title": "Risk Signals", "question": "What are the top business risks surfaced by recent data?"},
+        {"title": "Data Freshness", "question": "How fresh is the data behind our key metrics?"}
+      ]
+    }
+  ]
+}

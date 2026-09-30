@@ -59,6 +59,19 @@ def test_context_links_product_sales_to_customer_age_and_flags_40_plus_limit(ser
     assert any("exact 40+ cohort is not derivable" in rule for rule in context["business_rules"])
 
 
+def test_context_exposes_feedback_for_customer_complaints(service):
+    context = service.context("What are the top customer complaints this month?", "cfo-1")
+
+    tables = {table["name"] for table in context["tables"]}
+    assert "curated_feedback" in tables
+    feedback = next(table for table in context["tables"] if table["name"] == "curated_feedback")
+    assert {"rating", "comment", "sentiment", "occurred_at"} <= {column["name"] for column in feedback["columns"]}
+    assert any("rating <= 2" in rule and "negative" in rule for rule in context["business_rules"])
+    assert ("curated_feedback.customer_id", "dim_customer_profiles.customer_id") in {
+        (join["left"], join["right"]) for join in context["join_paths"]
+    }
+
+
 def test_execute_runs_generated_category_sql_read_only(service):
     result = service.execute(
         """

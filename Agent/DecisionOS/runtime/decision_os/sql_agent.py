@@ -126,7 +126,7 @@ class SQLAgent:
             "Data classification: synthetic.",
             "Answer in 2-4 sentences using only these rows. Lead with the direct answer and its value or share. "
             "If a placeholder group such as 'Uncategorized' or 'Unknown' dominates, say the breakdown is not meaningful because the attribute is missing. "
-            "Cite the evidence ID. Do not claim causality.",
+            "Do not include the evidence ID or SQL identifier in the prose answer; provenance is returned separately. Do not claim causality.",
         )
         return self.model.complete(ModelRequest(result.question, context, (), max_output_tokens=400)).text.strip()
 

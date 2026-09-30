@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Northstar Shopping Simulator</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260930">
 </head>
 <body>
   <main class="shell">
@@ -98,12 +98,12 @@
     </section>
     <section id="events-view" class="view customer-view" hidden>
       <div class="customer-heading"><div><p class="eyebrow">Event backbone / Correlation</p><h2>Captured enterprise events</h2><p class="lede">Inspect immutable events emitted by simulator workflows and service actions. Filter by workflow correlation ID to follow a customer journey.</p></div><span id="events-state" class="state">Not loaded</span></div>
-      <div class="directory-toolbar"><div><p class="eyebrow">Events / Filters</p><h3>Find event activity</h3></div><div class="directory-controls"><label class="search-field"><span>Correlation ID</span><input id="events-correlation-filter" type="search" placeholder="Optional workflow ID"></label><button id="refresh-events" class="refresh-button">Refresh</button></div></div>
+      <div class="directory-toolbar"><div><p class="eyebrow">Events / Filters</p><h3>Find event activity</h3></div><div class="directory-controls"><label class="search-field"><span>Correlation ID</span><input id="events-correlation-filter" type="search" placeholder="Optional workflow ID"></label><button id="refresh-events" class="refresh-button">Refresh</button><span id="events-pending" class="state">Pending sync: -</span><button id="sync-events" class="refresh-button">Sync all events</button></div></div>
       <div class="table-wrap"><table><thead><tr><th>Recorded</th><th>Event</th><th>Source</th><th>Aggregate</th><th>Correlation</th><th>Payload</th></tr></thead><tbody id="events-table-body"><tr><td colspan="6" class="table-message">Click Refresh to load events.</td></tr></tbody></table></div>
       <p id="events-feedback" class="feedback" role="status">Event service must be running on port 8007.</p>
     </section>
     <footer><span>Customer360 / Enterprise Simulator</span><span id="api-status">Checking CRM...</span></footer>
   </main>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260930"></script>
 </body>
 </html>

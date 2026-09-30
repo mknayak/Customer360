@@ -32,6 +32,7 @@ let currentCustomerId = '';
 let sites = [];
 let visits = [];
 let events = [];
+let eventStats = null;
 let activeSite = null;
 let activeVisit = null;
 let workflowCorrelationId = null;
@@ -511,11 +512,14 @@ function renderSitesSidebar() {
   return `${currentCustomerCard()}<div class="stat-grid"><div class="stat-card"><span>Sites</span><strong>${siteCount}</strong></div><div class="stat-card"><span>Visits</span><strong>${visitCount}</strong></div><div class="stat-card"><span>Likely links</span><strong>customer_id + site_id</strong></div><div class="stat-card"><span>Source</span><strong>site service</strong></div></div><p class="table-summary">Customer and order records connect by IDs; the site service owns visits and the site metadata.</p>`;
 }
 function renderEventsSidebar() {
-  const sourceCount = new Set(events.map((event) => event.source_service)).size;
-  const typeCount = new Set(events.map((event) => event.event_type)).size;
-  const correlationCount = new Set(events.map((event) => event.correlation_id).filter(Boolean)).size;
+  const stats = eventStats || {
+    events: events.length,
+    sources: new Set(events.map((event) => event.source_service)).size,
+    event_types: new Set(events.map((event) => event.event_type)).size,
+    correlations: new Set(events.map((event) => event.correlation_id).filter(Boolean)).size,
+  };
   const filter = document.querySelector('#events-correlation-filter')?.value || 'All workflows';
-  return `<div class="stat-grid"><div class="stat-card"><span>Events loaded</span><strong>${events.length}</strong></div><div class="stat-card"><span>Sources</span><strong>${sourceCount}</strong></div><div class="stat-card"><span>Event types</span><strong>${typeCount}</strong></div><div class="stat-card"><span>Correlations</span><strong>${correlationCount}</strong></div></div><p class="table-summary">Filter: ${filter}</p><p class="table-summary">Events are immutable records linked by correlation ID.</p>`;
+  return `<div class="stat-grid"><div class="stat-card"><span>Total events</span><strong>${stats.events}</strong></div><div class="stat-card"><span>Sources</span><strong>${stats.sources}</strong></div><div class="stat-card"><span>Event types</span><strong>${stats.event_types}</strong></div><div class="stat-card"><span>Correlations</span><strong>${stats.correlations}</strong></div></div><p class="table-summary">Showing ${events.length} of ${stats.events} events in the table.</p><p class="table-summary">Filter: ${filter}</p><p class="table-summary">Events are immutable records linked by correlation ID.</p>`;
 }
 function syncCurrentCustomer(customerId) {
   currentCustomerId = customerId || '';
@@ -674,14 +678,43 @@ async function loadSiteData() {
 }
 function renderEventData() {
   document.querySelector('#events-table-body').innerHTML = events.map((event) => `<tr class="clickable-row" data-record-type="event" data-record-id="${event.event_id}"><td>${formatDateTime(event.recorded_at)}</td><td><strong>${event.event_type}</strong></td><td>${event.source_service}</td><td>${event.aggregate_type} · ${event.aggregate_id.slice(0, 8)}</td><td>${event.correlation_id || '-'}</td><td><code>${JSON.stringify(event.payload)}</code></td></tr>`).join('') || '<tr><td colspan="6" class="table-message">No events found.</td></tr>';
-  document.querySelector('#events-state').textContent = `${events.length} events`;
+  document.querySelector('#events-state').textContent = eventStats ? `${events.length} of ${eventStats.events} events` : `${events.length} events`;
   if (document.querySelector('.tab.active')?.dataset.tab === 'events') activateLeftSidebar('events');
 }
 async function loadEventData() {
   const correlationId = document.querySelector('#events-correlation-filter').value.trim();
-  events = await api('events', `/api/events?limit=100${correlationId ? `&correlation_id=${encodeURIComponent(correlationId)}` : ''}`);
+  const correlationQuery = correlationId ? `correlation_id=${encodeURIComponent(correlationId)}` : '';
+  [events, eventStats] = await Promise.all([
+    api('events', `/api/events?limit=100${correlationQuery ? `&${correlationQuery}` : ''}`),
+    api('events', `/api/events/stats${correlationQuery ? `?${correlationQuery}` : ''}`),
+  ]);
   renderEventData();
   document.querySelector('#events-feedback').textContent = 'Event records loaded.';
+  await loadPendingSync();
+}
+async function loadPendingSync() {
+  const pendingElement = document.querySelector('#events-pending');
+  try {
+    const lag = await api('events', '/api/consumers/data-platform/lag');
+    pendingElement.textContent = `Pending sync: ${lag.pending}`;
+    document.querySelector('#sync-events').disabled = lag.pending === 0;
+  } catch (error) {
+    pendingElement.textContent = 'Pending sync: unavailable';
+  }
+}
+async function syncAllEvents() {
+  const button = document.querySelector('#sync-events');
+  const feedback = document.querySelector('#events-feedback');
+  button.disabled = true;
+  feedback.textContent = 'Syncing events to the Data Platform...';
+  try {
+    const result = await api('data-platform', '/api/ingest/event-service', { method: 'POST' });
+    feedback.textContent = `Synced ${result.stored} new events (${result.duplicates} duplicates, ${result.batches} batches).`;
+  } catch (error) {
+    feedback.textContent = `Sync failed: ${error.message}. Data Platform must be running on port 8010.`;
+  } finally {
+    await loadPendingSync();
+  }
 }
 async function loadEngagementData() {
   const result = await api('crm', '/api/customers?page=1&page_size=100'); loadedCustomers = result.items; renderJourneyCustomers();
@@ -699,7 +732,7 @@ async function simulateMarketingTouch() {
 async function submitFeedback() {
   const customerId = document.querySelector('#engagement-customer').value; const campaignId = document.querySelector('#engagement-campaign').value || null; const rating = Math.min(5, Math.max(1, Number(document.querySelector('#feedback-rating').value) || 1));
   if (!customerId) throw new Error('Select a customer first.');
-  const payload = { customer_id: customerId, campaign_id: campaignId, source: document.querySelector('#feedback-source').value, rating, sentiment: document.querySelector('#feedback-sentiment').value, comment: document.querySelector('#feedback-comment').value || null };
+  const payload = { customer_id: customerId, campaign_id: campaignId, product_id: productSelect?.value || null, order_id: activeOrder?.order_id || null, site_id: activeSite?.site_id || null, source: document.querySelector('#feedback-source').value, rating, sentiment: document.querySelector('#feedback-sentiment').value, comment: document.querySelector('#feedback-comment').value || null };
   const record = await api('feedback', '/api/feedback', { method: 'POST', body: JSON.stringify(payload) });
   document.querySelector('#feedback-flow-feedback').textContent = `Feedback ${record.feedback_id.slice(0, 8)} submitted.`;
   await loadEngagementData();
@@ -707,7 +740,7 @@ async function submitFeedback() {
 function randomItem(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
-function simulatedFeedbackPayload(customerId, campaignId) {
+function simulatedFeedbackPayload(customerId, campaignId, productId, orderId, siteId) {
   const sentimentPatterns = {
     positive: { ratings: [4, 5], comments: ['Offer arrived at the right moment and felt relevant.', 'The campaign made it easy to find what I needed.', 'Helpful message with a clear next step.'] },
     neutral: { ratings: [3, 4], comments: ['Useful enough, but not especially memorable.', 'The message was clear, though the timing was average.', 'I understood the promotion but did not act on it.'] },
@@ -718,7 +751,7 @@ function simulatedFeedbackPayload(customerId, campaignId) {
   const source = randomItem(['survey', 'web', 'mobile', 'store', 'support', 'social']);
   const sentiment = randomItem(Object.keys(sentimentPatterns));
   const pattern = sentimentPatterns[sentiment];
-  return { customer_id: customerId, campaign_id: campaignId || null, source, rating: randomItem(pattern.ratings), sentiment, comment: randomItem(pattern.comments), status: 'submitted' };
+  return { customer_id: customerId, campaign_id: campaignId || null, product_id: productId || null, order_id: orderId || null, site_id: siteId || null, source, rating: randomItem(pattern.ratings), sentiment, comment: randomItem(pattern.comments), status: 'submitted' };
 }
 async function simulateFeedback() {
   const selectedCustomerId = document.querySelector('#engagement-customer').value; const selectedCampaignId = document.querySelector('#engagement-campaign').value || null;
@@ -728,7 +761,7 @@ async function simulateFeedback() {
   if (!availableCustomers.length) throw new Error('Load customers before simulating feedback.');
   const counts = { positive: 0, neutral: 0, negative: 0, mixed: 0, unknown: 0 };
   for (let index = 0; index < size; index += 1) {
-    const payload = simulatedFeedbackPayload(randomItem(availableCustomers), availableCampaigns.length ? randomItem(availableCampaigns) : null);
+    const payload = simulatedFeedbackPayload(randomItem(availableCustomers), availableCampaigns.length ? randomItem(availableCampaigns) : null, catalog.length ? randomItem(catalog).product_id : null, activeOrder?.order_id || null, activeSite?.site_id || (sites.length ? randomItem(sites).site_id : null));
     const record = await api('feedback', '/api/feedback', { method: 'POST', body: JSON.stringify(payload) });
     await recordEvent('feedback', 'FeedbackSubmitted', 'feedback', record.feedback_id, { customer_id: record.customer_id, campaign_id: record.campaign_id, rating: record.rating, sentiment: record.sentiment });
     counts[record.sentiment] += 1;
@@ -775,6 +808,7 @@ document.querySelector('#refresh-engagement').addEventListener('click', () => lo
 document.querySelector('#refresh-sites').addEventListener('click', () => loadSiteData().catch((error) => { document.querySelector('#sites-feedback').textContent = error.message; }));
 document.querySelector('#sites-customer-filter').addEventListener('change', () => loadSiteData().catch((error) => { document.querySelector('#sites-feedback').textContent = error.message; }));
 document.querySelector('#refresh-events').addEventListener('click', () => loadEventData().catch((error) => { document.querySelector('#events-feedback').textContent = error.message; }));
+document.querySelector('#sync-events').addEventListener('click', syncAllEvents);
 document.querySelector('#events-correlation-filter').addEventListener('change', () => loadEventData().catch((error) => { document.querySelector('#events-feedback').textContent = error.message; }));
 document.querySelector('#refresh-customers').addEventListener('click', () => loadCustomers().catch(() => {}));
 document.querySelector('#refresh-orders').addEventListener('click', () => loadCartOrderData().catch((error) => { document.querySelector('#orders-feedback').textContent = error.message; }));

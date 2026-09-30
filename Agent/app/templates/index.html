@@ -63,6 +63,192 @@
         border-radius: 18px;
         padding: 14px;
       }
+      .status-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-width: 1px;
+        border-style: solid;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .04em;
+      }
+      .status-dot {
+        width: 8px; height: 8px; border-radius: 999px; display: inline-block;
+      }
+      .kpi-tile {
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, #ffffff, #f8fafc);
+        border-radius: 16px;
+        padding: 14px;
+      }
+      .kpi-tile.is-unavailable { background: #f8fafc; border-style: dashed; }
+      .kpi-label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .12em; color: var(--muted);
+      }
+      .kpi-value { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1.2; margin-top: 6px; }
+      .kpi-meta { margin-top: 6px; font-size: 10px; color: #94a3b8; }
+      .recent-item {
+        width: 100%;
+        text-align: left;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+      .recent-item:hover { border-color: #bfdbfe; background: var(--brand-soft); }
+
+      .search-stage {
+        max-width: 780px;
+        margin: 0 auto;
+        padding: 56px 0 8px;
+        text-align: center;
+      }
+      .search-headline {
+        font-size: clamp(28px, 4vw, 40px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: var(--text);
+        margin: 0;
+      }
+      .search-subline {
+        margin: 10px 0 0;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .search-shell {
+        margin-top: 28px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 10px 10px 10px 18px;
+        box-shadow: 0 12px 36px rgba(15,23,42,.08);
+        transition: border-color .15s ease, box-shadow .15s ease;
+      }
+      .search-shell:focus-within {
+        border-color: #93c5fd;
+        box-shadow: 0 16px 44px rgba(37,99,235,.16);
+      }
+      .search-icon { color: #94a3b8; font-size: 16px; }
+      .search-input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        outline: none;
+        background: transparent;
+        font-size: 17px;
+        color: var(--text);
+        padding: 12px 0;
+      }
+      .search-input::placeholder { color: #94a3b8; font-size: 15px; }
+      .search-submit {
+        flex: none;
+        background: var(--brand);
+        color: #fff;
+        border: 0;
+        border-radius: 12px;
+        padding: 12px 20px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .search-submit:hover { background: var(--brand-strong); }
+
+      .recent-row {
+        margin-top: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-height: 30px;
+      }
+      .recent-row.is-empty { display: none; }
+      .recent-row-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: #94a3b8;
+      }
+      .recent-row-items { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+      .recent-chip {
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 999px;
+        padding: 5px 12px;
+        font-size: 12px;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .recent-chip:hover { border-color: #bfdbfe; background: var(--brand-soft); color: var(--brand-strong); }
+      .recent-clear {
+        font-size: 11px;
+        font-weight: 600;
+        color: #94a3b8;
+        background: none;
+        border: 0;
+        cursor: pointer;
+      }
+      .recent-clear:hover { color: var(--muted); }
+
+      .suggest-categories {
+        margin-top: 40px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+      }
+      .suggest-list {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+        text-align: left;
+      }
+
+      .status-strip {
+        max-width: 980px;
+        margin: 48px auto 0;
+        border-top: 1px solid var(--line);
+        padding-top: 18px;
+      }
+      .status-strip-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .status-toggle {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: #94a3b8;
+        background: none;
+        border: 0;
+        cursor: pointer;
+      }
+      .status-toggle:hover { color: var(--muted); }
+      .brief-answer {
+        border-left: 4px solid var(--brand);
+        background: #f8fbff;
+        color: #1e293b;
+        font-size: 16px;
+        line-height: 1.75;
+        padding: 18px 20px;
+      }
       .sql-grid {
         width: 100%; border-collapse: collapse; font-size: 12px;
       }
@@ -109,7 +295,7 @@
             </button>
             <button class="nav-button rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 border border-transparent" data-view="dashboard">
               <i class="fa-solid fa-grid-2 mr-2 text-violet-600"></i>Live Dashboard
-              <span id="pinned-badge-count" class="ml-2 inline-flex items-center justify-center bg-blue-600 text-white text-[10px] w-5 h-5 rounded-full">2</span>
+              <span id="pinned-badge-count" class="ml-2 inline-flex items-center justify-center bg-blue-600 text-white text-[10px] w-5 h-5 rounded-full">0</span>
             </button>
           </nav>
 
@@ -123,83 +309,59 @@
     </div>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <section id="view-landing" class="max-w-4xl mx-auto pt-8">
-        <div class="text-center mb-7">
-          <div class="inline-flex items-center gap-2 border border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-bold uppercase tracking-[0.18em] px-3 py-2 rounded-full">
-            <i class="fa-solid fa-shield-check"></i>
-            Governed, traceable decisions
-          </div>
-          <h1 class="mt-6 text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900">What strategic insight do you need today?</h1>
-          <p class="mt-4 max-w-2xl mx-auto text-sm text-slate-600 leading-relaxed">
-            Ask natural-language questions and get evidence-backed answers across revenue, customer behavior, product performance, churn, and promotion ROI.
-          </p>
-        </div>
+      <section id="view-landing">
+        <div class="search-stage">
+          <h1 class="search-headline">Ask anything about the business.</h1>
+          <p class="search-subline">Every answer returns with its metric definition, source query, and lineage.</p>
 
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-card p-3">
-          <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-            <i class="fa-solid fa-magnifying-glass text-blue-600 text-lg"></i>
-            <input id="prompt" value="Why did gross margins contract in Q3 across hardware product lines?" class="w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 focus:outline-none" placeholder="Ask anything about your business..." />
-            <button id="ask-button" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md">
+          <div class="search-shell" id="search-shell">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input
+              id="prompt"
+              class="search-input"
+              autocomplete="off"
+              placeholder="e.g. Why did gross margins contract in Q3 across hardware product lines?"
+            />
+            <button id="ask-button" class="search-submit">
               Investigate <i class="fa-solid fa-arrow-right ml-2"></i>
             </button>
           </div>
+
+          <div id="recent-row" class="recent-row">
+            <span class="recent-row-label">Recent</span>
+            <div id="recent-investigations" class="recent-row-items"></div>
+            <button id="clear-recent" class="recent-clear">Clear</button>
+          </div>
+
+          <div id="prompt-categories" class="suggest-categories"></div>
+          <div id="prompt-list" class="suggest-list"></div>
         </div>
 
-        <div class="mt-5 flex items-center justify-between text-[11px] text-slate-500 uppercase tracking-[0.14em] font-semibold">
-          <span>Executive prompts</span>
-          <span class="text-slate-400">Pre-validated semantic workflows</span>
-        </div>
-
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="Why did gross margins contract in Q3 across hardware product lines?">
-            <div class="font-bold text-slate-900 flex items-center justify-between">
-              <span><i class="fa-solid fa-chart-line-down text-rose-500 mr-2"></i>Q3 Margin Contraction</span>
-              <i class="fa-solid fa-chevron-right text-slate-400"></i>
+        <div class="status-strip">
+          <div class="status-strip-head">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="status-chip border-amber-200 bg-amber-50 text-amber-700">
+                <i class="fa-solid fa-flask"></i> Synthetic data
+              </span>
+              <span id="chip-platform" class="status-chip border-slate-200 bg-slate-50 text-slate-600">
+                <span class="status-dot bg-slate-300"></span> Data platform
+              </span>
+              <span id="chip-model" class="status-chip border-slate-200 bg-slate-50 text-slate-600">
+                <i class="fa-solid fa-microchip"></i> Model
+              </span>
             </div>
-            <div class="mt-2 text-xs text-slate-500">Investigates freight surcharges and product mix pressure.</div>
-          </button>
+            <button id="toggle-status-details" class="status-toggle" aria-expanded="false">
+              Platform detail <i class="fa-solid fa-chevron-down ml-1 text-[10px]"></i>
+            </button>
+          </div>
 
-          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="Why did North America enterprise customer churn spike in July?">
-            <div class="font-bold text-slate-900 flex items-center justify-between">
-              <span><i class="fa-solid fa-user-minus text-amber-500 mr-2"></i>Churn Spike</span>
-              <i class="fa-solid fa-chevron-right text-slate-400"></i>
+          <div id="status-details" class="hidden mt-4 grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div class="lg:col-span-2">
+              <div id="kpi-strip" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+              <div id="kpi-note" class="mt-3 text-[11px] text-slate-500">Loading governed metrics from the data platform&hellip;</div>
             </div>
-            <div class="mt-2 text-xs text-slate-500">Checks escalations, support SLA gaps, and release impacts.</div>
-          </button>
-
-          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="Forecast revenue impact of a 10% price increase on Tier-1 SaaS subscriptions">
-            <div class="font-bold text-slate-900 flex items-center justify-between">
-              <span><i class="fa-solid fa-calculator text-violet-500 mr-2"></i>Pricing Simulation</span>
-              <i class="fa-solid fa-chevron-right text-slate-400"></i>
-            </div>
-            <div class="mt-2 text-xs text-slate-500">Model elasticity, net ARR impacts, and churn sensitivity.</div>
-          </button>
-
-          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="Compare customer acquisition cost across channels">
-            <div class="font-bold text-slate-900 flex items-center justify-between">
-              <span><i class="fa-solid fa-bullseye text-emerald-500 mr-2"></i>Channel ROI</span>
-              <i class="fa-solid fa-chevron-right text-slate-400"></i>
-            </div>
-            <div class="mt-2 text-xs text-slate-500">Assesses paid search, event, and organic acquisition efficiency.</div>
-          </button>
-
-          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="Which KPI needs attention most urgently this week?">
-            <div class="font-bold text-slate-900 flex items-center justify-between">
-              <span><i class="fa-solid fa-gauge-high text-blue-500 mr-2"></i>KPI Watchlist</span>
-              <i class="fa-solid fa-chevron-right text-slate-400"></i>
-            </div>
-            <div class="mt-2 text-xs text-slate-500">Surfaces the most important governed metric to review.</div>
-          </button>
-
-          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="How is customer retention trending by month?"><div class="font-bold text-slate-900 flex items-center justify-between"><span><i class="fa-solid fa-arrows-rotate text-cyan-500 mr-2"></i>Retention Trend</span><i class="fa-solid fa-chevron-right text-slate-400"></i></div><div class="mt-2 text-xs text-slate-500">Tracks repeat purchasing behavior across recent periods.</div></button>
-
-          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="What is the cart abandonment rate?"><div class="font-bold text-slate-900 flex items-center justify-between"><span><i class="fa-solid fa-cart-shopping text-orange-500 mr-2"></i>Cart Abandonment</span><i class="fa-solid fa-chevron-right text-slate-400"></i></div><div class="mt-2 text-xs text-slate-500">Measures checkout leakage and the scale of recovery opportunity.</div></button>
-
-          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="How many times did payment fail this month?"><div class="font-bold text-slate-900 flex items-center justify-between"><span><i class="fa-solid fa-credit-card text-rose-500 mr-2"></i>Payment Failures</span><i class="fa-solid fa-chevron-right text-slate-400"></i></div><div class="mt-2 text-xs text-slate-500">Counts failed payments and highlights avoidable revenue friction.</div></button>
-
-          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="What is the top-selling product by units?"><div class="font-bold text-slate-900 flex items-center justify-between"><span><i class="fa-solid fa-box-open text-indigo-500 mr-2"></i>Product Demand</span><i class="fa-solid fa-chevron-right text-slate-400"></i></div><div class="mt-2 text-xs text-slate-500">Identifies the product driving the most unit volume.</div></button>
-
-          <button class="sample-question text-left bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50" data-question="What is the most dropped page on our website?"><div class="font-bold text-slate-900 flex items-center justify-between"><span><i class="fa-solid fa-arrow-trend-down text-amber-500 mr-2"></i>Web Drop-off</span><i class="fa-solid fa-chevron-right text-slate-400"></i></div><div class="mt-2 text-xs text-slate-500">Finds the page with the highest exit volume for focused optimization.</div></button>
+            <dl id="platform-signals" class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"></dl>
+          </div>
         </div>
       </section>
 
@@ -259,22 +421,10 @@
             </div>
           </div>
 
-          <div id="brief-summary" class="mt-4 text-sm leading-relaxed text-slate-700">
+          <div class="mt-5">
+            <div class="mb-2 text-[10px] uppercase tracking-[0.16em] text-blue-700 font-bold">Decision answer</div>
+            <div id="brief-summary" class="brief-answer rounded-xl">
             Q3 gross margins contracted in hardware and logistics-heavy products, while enterprise SaaS continued to expand. The most material opportunity is to shift promotion spend toward the strongest net-margin categories.
-          </div>
-
-          <div class="mini-grid mt-6">
-            <div class="widget-box">
-              <div class="text-[10px] uppercase tracking-[0.16em] text-slate-500 font-bold">Strongest segment</div>
-              <div id="metric-1" class="mt-2 text-base font-extrabold text-emerald-600">Enterprise Cloud (+18.2%)</div>
-            </div>
-            <div class="widget-box">
-              <div class="text-[10px] uppercase tracking-[0.16em] text-slate-500 font-bold">Margin drag</div>
-              <div id="metric-2" class="mt-2 text-base font-extrabold text-rose-600">Hardware IoT (-4.8%)</div>
-            </div>
-            <div class="widget-box">
-              <div class="text-[10px] uppercase tracking-[0.16em] text-slate-500 font-bold">Recommended action</div>
-              <div id="metric-3" class="mt-2 text-base font-extrabold text-blue-700">Reallocate promo spend to SaaS</div>
             </div>
           </div>
         </div>
@@ -375,7 +525,8 @@
       const views = ['landing','loading','results','dashboard'];
       const STORAGE_KEYS = {
         pinnedWidgets: 'decisionos.pinnedWidgets',
-        lastBrief: 'decisionos.lastBrief'
+        lastBrief: 'decisionos.lastBrief',
+        recentQuestions: 'decisionos.recentQuestions'
       };
 
       const pinnedWidgets = [];
@@ -441,6 +592,7 @@
         document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
         const active = document.querySelector('[data-view="' + name + '"]');
         if (active) active.classList.add('active');
+        if (name === 'landing') loadLandingOverview();
       }
 
       function togglePolishPanel(forceOpen) {
@@ -469,9 +621,6 @@
         document.getElementById('brief-title').textContent = data.question ? 'Executive Decision Brief: ' + data.question : 'Executive Decision Brief';
         document.getElementById('brief-confidence').textContent = data.confidence || '95%';
         document.getElementById('brief-summary').innerHTML = data.answer || 'The analysis indicates a clear margin trend and a targeted optimization opportunity.';
-        document.getElementById('metric-1').textContent = data.metrics && data.metrics[0] ? data.metrics[0].label : 'Enterprise Cloud (+18.2%)';
-        document.getElementById('metric-2').textContent = data.limitations && data.limitations[0] ? data.limitations[0].slice(0, 50) : 'Hardware IoT (-4.8%)';
-        document.getElementById('metric-3').textContent = (data.recommendations && data.recommendations[0]) || 'Reallocate promo spend to SaaS';
         document.getElementById('tech-sql-code').textContent = data.evidence && data.evidence[0] && data.evidence[0].query ? JSON.stringify(data.evidence[0].query, null, 2) : 'SELECT product_category, SUM(revenue), AVG(margin_pct) FROM warehouse.fact_financials WHERE fiscal_quarter = "Q3";';
         document.getElementById('chart-title').textContent = getChartTitle(data);
         renderBriefChart(data);
@@ -480,19 +629,220 @@
       }
 
       document.querySelectorAll('.nav-button').forEach(button => {
-        button.addEventListener('click', () => showView(button.dataset.view));
+        button.addEventListener('click', () => {
+          if (button.dataset.view === 'results' && activeBrief) {
+            applyBriefToView(activeBrief, false);
+            return;
+          }
+          showView(button.dataset.view);
+          if (button.dataset.view === 'landing') document.getElementById('prompt').focus();
+        });
       });
 
-      document.querySelectorAll('.sample-question').forEach(button => {
-        button.addEventListener('click', () => {
-          document.getElementById('prompt').value = button.dataset.question;
-          document.getElementById('ask-button').click();
+      let promptCategories = [];
+
+      function renderPromptList(categoryId) {
+        const category = promptCategories.find(item => item.id === categoryId);
+        document.querySelectorAll('.prompt-category').forEach(chip => {
+          const active = chip.dataset.category === categoryId;
+          chip.classList.toggle('bg-blue-600', active);
+          chip.classList.toggle('text-white', active);
+          chip.classList.toggle('border-blue-600', active);
+          chip.classList.toggle('bg-white', !active);
+          chip.classList.toggle('text-slate-700', !active);
         });
+        const list = document.getElementById('prompt-list');
+        list.replaceChildren();
+        if (!category) return;
+        for (const prompt of category.prompts) {
+          const button = document.createElement('button');
+          button.className = 'sample-question text-left bg-white border border-slate-200 rounded-xl px-4 py-3 hover:border-blue-300 hover:bg-blue-50';
+          button.dataset.question = prompt.question;
+          const header = document.createElement('div');
+          header.className = 'text-sm font-semibold text-slate-900 flex items-center justify-between gap-3';
+          const title = document.createElement('span');
+          const icon = document.createElement('i');
+          icon.className = `fa-solid ${category.icon} ${category.color} mr-2`;
+          title.append(icon, prompt.title);
+          const chevron = document.createElement('i');
+          chevron.className = 'fa-solid fa-chevron-right text-slate-300 text-xs';
+          header.append(title, chevron);
+          const question = document.createElement('div');
+          question.className = 'mt-1 text-xs text-slate-500';
+          question.textContent = prompt.question;
+          button.append(header, question);
+          button.addEventListener('click', () => {
+            document.getElementById('prompt').value = prompt.question;
+            document.getElementById('ask-button').click();
+          });
+          list.appendChild(button);
+        }
+      }
+
+      function formatKpiValue(tile) {
+        const value = tile.value;
+        if (value === null || value === undefined || typeof value === 'object') return '—';
+        if (tile.format === 'currency') {
+          return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', notation: Math.abs(value) >= 1000000 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(value);
+        }
+        if (tile.format === 'percent') return (Number(value) * 100).toFixed(1) + '%';
+        return new Intl.NumberFormat().format(value);
+      }
+
+      function renderKpiStrip(overview) {
+        const strip = document.getElementById('kpi-strip');
+        strip.replaceChildren();
+        for (const tile of overview.tiles || []) {
+          const box = document.createElement('div');
+          box.className = 'kpi-tile' + (tile.status === 'resolved' ? '' : ' is-unavailable');
+          const label = document.createElement('div');
+          label.className = 'kpi-label';
+          label.textContent = tile.label;
+          const value = document.createElement('div');
+          value.className = 'kpi-value';
+          value.textContent = tile.status === 'resolved' ? formatKpiValue(tile) : 'Unavailable';
+          const meta = document.createElement('div');
+          meta.className = 'kpi-meta';
+          meta.textContent = tile.status === 'resolved' ? `${tile.owner} · ${tile.source}` : 'Data platform not reachable';
+          if (tile.definition) box.title = tile.definition;
+          box.append(label, value, meta);
+          strip.appendChild(box);
+        }
+      }
+
+      function renderPlatformSignals(overview) {
+        const platform = overview.platform || {};
+        const online = platform.data_platform === 'online';
+
+        const platformChip = document.getElementById('chip-platform');
+        platformChip.className = 'status-chip ' + (online ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700');
+        platformChip.replaceChildren();
+        const dot = document.createElement('span');
+        dot.className = 'status-dot ' + (online ? 'bg-emerald-500' : 'bg-rose-500');
+        platformChip.append(dot, document.createTextNode(online ? 'Data platform online' : 'Data platform offline'));
+
+        const modelChip = document.getElementById('chip-model');
+        modelChip.className = 'status-chip ' + (platform.model_configured ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-slate-50 text-slate-600');
+        modelChip.replaceChildren();
+        const modelIcon = document.createElement('i');
+        modelIcon.className = 'fa-solid fa-microchip';
+        modelChip.append(modelIcon, document.createTextNode(platform.model_provider || 'deterministic'));
+
+        const rows = [
+          ['Ingested events', platform.raw_events === null || platform.raw_events === undefined ? '—' : new Intl.NumberFormat().format(platform.raw_events)],
+          ['Latest event', platform.latest_event_at ? String(platform.latest_event_at).replace('T', ' ').slice(0, 19) : '—'],
+          ['Quality checks', platform.quality_passed === true ? 'Passed' : platform.quality_passed === false ? 'Attention required' : '—'],
+          ['Data classification', overview.data_classification === 'synthetic' ? 'Synthetic (not production)' : String(overview.data_classification || '—')],
+          ['Model provider', platform.model_configured ? String(platform.model_provider) : 'Deterministic fallback'],
+        ];
+        const list = document.getElementById('platform-signals');
+        list.replaceChildren();
+        for (const [term, detail] of rows) {
+          const row = document.createElement('div');
+          row.className = 'flex items-start justify-between gap-3';
+          const dt = document.createElement('dt');
+          dt.className = 'text-xs text-slate-500';
+          dt.textContent = term;
+          const dd = document.createElement('dd');
+          dd.className = 'text-xs font-bold text-slate-800 text-right';
+          dd.textContent = detail;
+          row.append(dt, dd);
+          list.appendChild(row);
+        }
+
+        const note = document.getElementById('kpi-note');
+        note.textContent = online
+          ? 'Live governed metrics. Hover a tile to see its metric definition.'
+          : 'Data platform unreachable — tiles show no value rather than an estimate.';
+      }
+
+      async function loadLandingOverview() {
+        try {
+          const response = await fetch('/api/landing/overview');
+          if (!response.ok) throw new Error('overview unavailable');
+          const overview = await response.json();
+          renderKpiStrip(overview);
+          renderPlatformSignals(overview);
+        } catch (error) {
+          document.getElementById('kpi-note').textContent = 'Governed metrics could not be loaded. No estimated values are shown.';
+        }
+      }
+
+      function renderRecentInvestigations() {
+        const container = document.getElementById('recent-investigations');
+        const row = document.getElementById('recent-row');
+        const recent = readStorage(STORAGE_KEYS.recentQuestions, []);
+        container.replaceChildren();
+        if (!Array.isArray(recent) || !recent.length) {
+          row.classList.add('is-empty');
+          return;
+        }
+        row.classList.remove('is-empty');
+        for (const entry of recent.slice(0, 4)) {
+          const button = document.createElement('button');
+          button.className = 'recent-chip';
+          button.textContent = entry.question;
+          button.title = entry.question + ' — ' + new Date(entry.askedAt).toLocaleString();
+          button.addEventListener('click', () => {
+            document.getElementById('prompt').value = entry.question;
+            document.getElementById('ask-button').click();
+          });
+          container.appendChild(button);
+        }
+      }
+
+      function recordRecentQuestion(question) {
+        const recent = readStorage(STORAGE_KEYS.recentQuestions, []);
+        const history = Array.isArray(recent) ? recent.filter(entry => entry.question !== question) : [];
+        history.unshift({ question, askedAt: new Date().toISOString() });
+        writeStorage(STORAGE_KEYS.recentQuestions, history.slice(0, 8));
+        renderRecentInvestigations();
+      }
+
+      document.getElementById('clear-recent').addEventListener('click', () => {
+        writeStorage(STORAGE_KEYS.recentQuestions, []);
+        renderRecentInvestigations();
+      });
+
+      async function loadPromptLibrary() {        try {
+          const response = await fetch('/api/prompt-library');
+          if (!response.ok) return;
+          promptCategories = (await response.json()).categories || [];
+        } catch (error) {
+          return;
+        }
+        const container = document.getElementById('prompt-categories');
+        container.replaceChildren();
+        for (const category of promptCategories) {
+          const chip = document.createElement('button');
+          chip.className = 'prompt-category inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:border-blue-300';
+          chip.dataset.category = category.id;
+          const icon = document.createElement('i');
+          icon.className = `fa-solid ${category.icon}`;
+          chip.append(icon, category.label);
+          chip.addEventListener('click', () => renderPromptList(category.id));
+          container.appendChild(chip);
+        }
+        if (promptCategories.length) renderPromptList(promptCategories[0].id);
+      }
+
+      document.getElementById('toggle-status-details').addEventListener('click', event => {
+        const details = document.getElementById('status-details');
+        const open = details.classList.toggle('hidden') === false;
+        event.currentTarget.setAttribute('aria-expanded', String(open));
+      });
+
+      document.getElementById('prompt').addEventListener('keydown', event => {
+        if (event.key === 'Enter') document.getElementById('ask-button').click();
       });
 
       document.getElementById('ask-button').addEventListener('click', async () => {
         const value = document.getElementById('prompt').value.trim();
-        if (!value) return;
+        if (!value) {
+          document.getElementById('prompt').focus();
+          return;
+        }
+        recordRecentQuestion(value);
         document.getElementById('loading-question').textContent = '"' + value + '"';
         showView('loading');
 
@@ -570,19 +920,29 @@
       }
 
       function getBriefRows(data) {
+        const rowSources = [];
         if (data && data.profile_breakdown && Array.isArray(data.profile_breakdown.rows)) {
-          return data.profile_breakdown.rows;
+          rowSources.push(data.profile_breakdown.rows);
         }
         if (data && data.time_series && Array.isArray(data.time_series.points)) {
-          return data.time_series.points;
+          rowSources.push(data.time_series.points);
         }
         if (data && data.sql_result && Array.isArray(data.sql_result.rows)) {
-          return data.sql_result.rows;
+          rowSources.push(data.sql_result.rows);
         }
+        const populatedRows = rowSources.find(rows => rows.length > 0);
+        if (populatedRows) return populatedRows;
         if (data && Array.isArray(data.metrics)) {
-          return data.metrics.map(metric => ({label: metric.label, value: metric.value, unit: metric.unit}));
+          return data.metrics.flatMap(metric => {
+            if (Array.isArray(metric.value)) {
+              return metric.value.map(value => value && typeof value === 'object'
+                ? value
+                : ({label: metric.label, value, unit: metric.unit}));
+            }
+            return [{label: metric.label, value: metric.value, unit: metric.unit}];
+          });
         }
-        return [];
+        return rowSources[0] || [];
       }
 
       function getChartTitle(data) {
@@ -618,7 +978,7 @@
         if (!grid) return;
         grid.innerHTML = '';
         if (!pinnedWidgets.length) {
-          grid.innerHTML = '<div class="dash-card p-6 text-sm text-slate-500">Pin an executive brief to create your first live dashboard card.</div>';
+          grid.innerHTML = '<div class="dash-card p-6 text-sm text-slate-500">No graphs on your dashboard. Pin an executive brief to add one.</div>';
           return;
         }
         if (typeof Chart === 'undefined') return;
@@ -628,7 +988,7 @@
           wrap.innerHTML = `
             <div class="flex items-center justify-between pb-3 border-b border-slate-200">
               <div class="font-bold text-slate-900 text-sm">${widget.title}</div>
-              <div class="flex items-center gap-2"><span class="text-[10px] text-slate-500 bg-slate-100 px-2 py-1 rounded-full">${widget.freshness}</span><button class="refresh-pinned-widget text-blue-600 hover:text-blue-800" data-widget-id="${widget.widgetId}" title="Refresh this result"><i class="fa-solid fa-rotate"></i></button></div>
+              <div class="flex items-center gap-2"><span class="text-[10px] text-slate-500 bg-slate-100 px-2 py-1 rounded-full">${widget.freshness}</span><button class="refresh-pinned-widget text-blue-600 hover:text-blue-800" data-widget-id="${widget.widgetId}" title="Refresh this result" aria-label="Refresh ${widget.title}"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button><button class="remove-pinned-widget text-slate-400 hover:text-rose-600" data-widget-id="${widget.widgetId}" title="Remove graph" aria-label="Remove ${widget.title} from dashboard"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button></div>
             </div>
             <div class="mt-4 h-44"><canvas data-widget="${widget.title}"></canvas></div>
           `;
@@ -685,6 +1045,17 @@
       });
 
       document.getElementById('pinned-dashboard-grid').addEventListener('click', async event => {
+        const removeButton = event.target.closest('.remove-pinned-widget');
+        if (removeButton) {
+          const widgetIndex = pinnedWidgets.findIndex(item => item.widgetId === removeButton.dataset.widgetId);
+          if (widgetIndex !== -1) {
+            pinnedWidgets.splice(widgetIndex, 1);
+            persistPinnedWidgets();
+            renderPinnedDashboardGrid();
+          }
+          return;
+        }
+
         const button = event.target.closest('.refresh-pinned-widget');
         if (!button) return;
         const widget = pinnedWidgets.find(item => item.widgetId === button.dataset.widgetId);
@@ -778,13 +1149,14 @@
         `;
       });
 
+      loadPromptLibrary();
+      loadLandingOverview();
+      renderRecentInvestigations();
       restorePinnedWidgets();
       const restoredBrief = restoreBrief();
-      if (restoredBrief) {
-        applyBriefToView(restoredBrief, false);
-      } else {
-        showLanding();
-      }
+      if (restoredBrief) activeBrief = restoredBrief;
+      showLanding();
+      document.getElementById('prompt').focus();
       renderPinnedDashboardGrid();
     </script>
   </body>
