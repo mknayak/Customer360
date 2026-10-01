@@ -81,13 +81,13 @@
   .cols{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:22px;align-items:start;margin-top:22px}
   .sect{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 10px}
   .sect h2{margin:0;font-size:15px;font-weight:800}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
-  .kpi{position:relative;background:#fff;padding:16px 18px 14px;text-align:left;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;transition:transform .12s,box-shadow .12s}
+  .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}
+  .kpi{position:relative;background:#fff;padding:16px 12px 14px;text-align:left;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;transition:transform .12s,box-shadow .12s}
   .kpi::before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:var(--c,var(--c1))}
   .kpi::after{content:"";position:absolute;right:-30px;top:-30px;width:90px;height:90px;border-radius:50%;background:var(--c,var(--c1));opacity:.08}
   .kpi:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(10,26,63,.08),0 14px 30px rgba(10,26,63,.14)}
   .kpi .eyebrow{color:var(--muted)}
-  .kpi .v{font-size:32px;font-weight:800;margin:6px 0 4px;letter-spacing:-.02em;color:var(--text)}
+  .kpi .v{font-size:26px;font-weight:800;margin:6px 0 4px;letter-spacing:-.02em;color:var(--text)}
   .kpi.na .v{color:var(--faint);font-size:22px}
   .kpi .m{font-size:12px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .kpi .go{position:absolute;right:14px;bottom:12px;font-size:12px;font-weight:700;color:var(--c,var(--c1));opacity:0}
@@ -142,8 +142,8 @@
   .conf-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ok),var(--accent2));border-radius:4px}
   .wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px}
 
-  @media (max-width:1000px){.cols,.inv{grid-template-columns:1fr}.gsearch{display:none}.ctl{margin-left:auto}.hero{padding:26px 22px}.hero h1{font-size:26px}}
-  @media (max-width:640px){main{padding:16px}.ctl .sel.opt{display:none}}
+  @media (max-width:1000px){.cols,.inv{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.gsearch{display:none}.ctl{margin-left:auto}.hero{padding:26px 22px}.hero h1{font-size:26px}}
+  @media (max-width:640px){main{padding:16px}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ctl .sel.opt{display:none}}
 </style>
 </head>
 <body>
